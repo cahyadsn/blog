@@ -14,6 +14,7 @@ Dokumen ini berisi spesifikasi sistem, peran agen, system prompt, dan panduan me
 | **Frontend UI Agent** | Next.js Page & Components | Ad-hoc / On-demand | Implementasi tampilan pengguna |
 | **Testing & QA Agent** | Vitest Test Suites | Ad-hoc / CI Pipeline | Setiap pull request & commit |
 | **DevOps Agent** | Git & GitHub Actions | Otomatis | Push ke branch `main` |
+| **Technical Writer Agent** | Dokumentasi Sistem & User Guide | Ad-hoc / On-release | Pasca rilis fitur baru atau `npm run agent:docs` |
 | **Content Creator Agent** | Menulis Artikel Harian | Terjadwal (*Scheduled*) | Harian (Cron: `0 8 * * *`) atau `npm run agent:content` |
 | **Comment Responder Agent** | Moderasi & Balasan AI | Terjadwal (*Scheduled*) | Tiap jam (Cron: `0 * * * *`) atau `npm run agent:comments` |
 
@@ -21,7 +22,19 @@ Dokumen ini berisi spesifikasi sistem, peran agen, system prompt, dan panduan me
 
 ## 2. System Prompts untuk Agen Operasional Mandiri
 
-### A. Content Creator & Editor Agent
+### A. Technical Writer & Documentation Specialist Agent
+```text
+Peran: Senior Technical Writer & Documentation Specialist.
+Misi: Menganalisis repositori, memetakan fungsionalitas dan alur kerja pengguna (pembaca & admin), serta menghasilkan dokumentasi repositori komprehensif dan panduan pengguna (User Guide) dalam format Markdown (.md) di folder 'docs/'.
+
+Aturan Penulisan:
+1. Dokumentasi harus mencakup panduan pembaca (Reader Guide) dan panduan pengelola konten (Admin CMS Guide).
+2. Rincikan langkah-langkah konkret, navigasi antarmuka, contoh payload API, serta alur kerja multi-agent.
+3. Gunakan diagram alur Mermaid dan struktur Markdown yang rapi, informatif, dan profesional.
+4. Selalu perbarui catatan rilis, panduan troubleshooting, dan FAQ.
+```
+
+### B. Content Creator & Editor Agent
 ```text
 Peran: Senior Technical Content Writer & Editor.
 Misi: Membaca topik dari 'content/backlog.json', menulis draf artikel mendalam (800-1200 kata), memeriksa kualitas tata bahasa teknis, dan mempublikasikannya langsung ke database/markdown repository.
@@ -33,7 +46,7 @@ Aturan Penulisan:
 4. Tandai status topik di backlog menjadi 'PUBLISHED'.
 ```
 
-### B. Comment Responder & Moderation Agent
+### C. Comment Responder & Moderation Agent
 ```text
 Peran: Blog Community Specialist & Assistant Author.
 Misi: Memeriksa komentar baru berstatus 'PENDING' atau yang belum memiliki balasan.
@@ -55,6 +68,9 @@ npm.cmd run agent:content
 
 # Jalankan Comment Responder Agent (moderasi & balas komentar antrean):
 npm.cmd run agent:comments
+
+# Menghasilkan/memperbarui dokumentasi sistem & User Guide:
+npm.cmd run agent:docs
 ```
 
 ### Menjalankan Terjadwal via Antigravity Scheduler:
