@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, Terminal } from "lucide-react";
+import { Sparkles, Terminal, LayoutDashboard } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -19,9 +19,16 @@ export function Navbar() {
           </div>
         </Link>
 
-        <nav className="flex items-center gap-6 text-sm font-medium text-gray-600 dark:text-gray-300">
+        <nav className="flex items-center gap-5 text-sm font-medium text-gray-600 dark:text-gray-300">
           <Link href="/" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
             Beranda
+          </Link>
+          <Link
+            href="/admin"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-gray-800 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300 transition-colors font-semibold text-gray-800 dark:text-gray-200"
+          >
+            <LayoutDashboard className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span>Admin</span>
           </Link>
           <a
             href="https://github.com"
