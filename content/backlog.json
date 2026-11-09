@@ -1,0 +1,56 @@
+[
+  {
+    "id": "topic-1",
+    "title": "Membangun Aplikasi Fullstack Modern dengan Next.js 15 dan Server Actions",
+    "category": "Web Development",
+    "tags": [
+      "Next.js",
+      "React",
+      "Fullstack",
+      "WebDev"
+    ],
+    "targetAudience": "Frontend dan Fullstack Developer",
+    "keyTakeaways": [
+      "Mengapa Server Actions mempermudah integrasi form dan mutasi data",
+      "Perbedaan mendasar Server Components dan Client Components di React 19",
+      "Pola optimasi performa dan caching di Next.js 15"
+    ],
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "topic-2",
+    "title": "Arsitektur Multi-Agent: Cara AI Mengotomatisasi Siklus Pengembangan Software",
+    "category": "Artificial Intelligence",
+    "tags": [
+      "AI",
+      "Multi-Agent",
+      "SoftwareEngineering",
+      "Automation"
+    ],
+    "targetAudience": "Software Architect dan Tech Lead",
+    "keyTakeaways": [
+      "Transisi dari Prompt Tunggal menuju Kolaborasi Agen Spesialis",
+      "Pemisahan tugas agen: Desain, Basis Data, Backend, QA, dan DevOps",
+      "Best practices monitoring dan evaluasi hasil kerja subagent"
+    ],
+    "status": "READY"
+  },
+  {
+    "id": "topic-3",
+    "title": "Panduan Praktis Desain Basis Data untuk Skalabilitas dan Kecepatan Baca",
+    "category": "Database Engineering",
+    "tags": [
+      "Database",
+      "SQL",
+      "Prisma",
+      "Performance"
+    ],
+    "targetAudience": "Backend Developer dan Database Administrator",
+    "keyTakeaways": [
+      "Strategi indeks pada kolom slug dan timestamp publikasi",
+      "Pencegahan N+1 query problem dengan ORM modern",
+      "Kapan saat yang tepat beralih dari SQLite ke PostgreSQL/Distributed DB"
+    ],
+    "status": "READY"
+  }
+]
