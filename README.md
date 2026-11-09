@@ -107,7 +107,7 @@ flowchart TD
 ## 📁 Project Directory Structure
 
 ```
-d:/c/blog/
+blog/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                 # GitHub Actions CI pipeline
