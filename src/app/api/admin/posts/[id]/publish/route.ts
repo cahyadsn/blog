@@ -4,8 +4,10 @@ import { db } from "@/lib/db";
 
 const PublishToggleSchema = z.object({
   published: z.boolean({
-    required_error: "Status publikasi diperlukan",
-    invalid_type_error: "Status publikasi harus bernilai boolean",
+    error: (issue) =>
+      issue.input === undefined
+        ? "Status publikasi diperlukan"
+        : "Status publikasi harus bernilai boolean",
   }),
 });
 
