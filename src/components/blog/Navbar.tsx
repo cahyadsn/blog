@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Sparkles, Terminal, LayoutDashboard } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export function Navbar() {
   return (
@@ -19,7 +20,7 @@ export function Navbar() {
           </div>
         </Link>
 
-        <nav className="flex items-center gap-5 text-sm font-medium text-gray-600 dark:text-gray-300">
+        <nav className="flex items-center gap-4 text-sm font-medium text-gray-600 dark:text-gray-300">
           <Link href="/" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
             Beranda
           </Link>
@@ -31,14 +32,15 @@ export function Navbar() {
             <span>Admin</span>
           </Link>
           <a
-            href="https://github.com"
+            href="https://github.com/cahyadsn/blog"
             target="_blank"
             rel="noreferrer"
             className="hidden sm:flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
           >
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Autonomous Hub</span>
+            <span>GitHub</span>
           </a>
+          <ThemeToggle />
         </nav>
       </div>
     </header>

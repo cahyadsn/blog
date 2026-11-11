@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { LayoutDashboard, ExternalLink } from "lucide-react";
+import { LogoutButton } from "@/components/admin/LogoutButton";
 
 export const metadata: Metadata = {
   title: "CMS Admin Dashboard | Antigravity Blog",
@@ -28,7 +29,7 @@ export default function AdminLayout({
                 CMS Admin Dashboard
               </h1>
               <Badge variant="secondary" className="font-semibold text-[11px]">
-                Internal Mode
+                Protected Mode
               </Badge>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -37,14 +38,15 @@ export default function AdminLayout({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/80 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/80 transition-colors shadow-xs"
           >
             <ExternalLink className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
             <span>Lihat Blog</span>
           </Link>
+          <LogoutButton />
         </div>
       </div>
 

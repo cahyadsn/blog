@@ -7,15 +7,17 @@ Selamat datang di **Panduan Pengguna Antigravity Multi-Agent Blog**. Dokumen ini
 ## Daftar Isi
 1. [Ikhtisar Aplikasi](#1-ikhtisar-aplikasi)
 2. [Panduan Pembaca (Public Blog Interface)](#2-panduan-pembaca-public-blog-interface)
-   - [Navigasi Beranda](#navigasi-beranda)
+   - [Navigasi Beranda & Toggle Tema (Dark/Light Mode)](#navigasi-beranda--toggle-tema-darklight-mode)
+   - [Pencarian Artikel & Filter Tag (Full-Text Search)](#pencarian-artikel--filter-tag-full-text-search)
    - [Membaca Artikel](#membaca-artikel)
    - [Berpartisipasi dalam Kolom Komentar](#berpartisipasi-dalam-kolom-komentar)
 3. [Panduan Administrator (Admin CMS Dashboard)](#3-panduan-administrator-admin-cms-dashboard)
-   - [Mengakses Dashboard Admin](#mengakses-dashboard-admin)
+   - [Sistem Autentikasi & Login Admin](#sistem-autentikasi--login-admin)
    - [Manajemen Artikel (Post Management)](#manajemen-artikel-post-management)
    - [Editor Markdown & Live Preview](#editor-markdown--live-preview)
    - [Moderasi Komentar (Comment Moderation)](#moderasi-komentar-comment-moderation)
    - [Membalas Komentar sebagai Author](#membalas-komentar-sebagai-author)
+   - [Keluar dari Sesi Admin (Logout)](#keluar-dari-sesi-admin-logout)
 4. [Panduan Agen Operasional Mandiri (Autonomous Agents)](#4-panduan-agen-operasional-mandiri-autonomous-agents)
    - [Content Creator Agent (Posting Harian)](#content-creator-agent-posting-harian)
    - [Comment Responder Agent (Auto-Reply & Moderasi)](#comment-responder-agent-auto-reply--moderasi)
@@ -26,12 +28,13 @@ Selamat datang di **Panduan Pengguna Antigravity Multi-Agent Blog**. Dokumen ini
 
 ## 1. Ikhtisar Aplikasi
 
-Aplikasi ini adalah platform blog modern berbasis **Next.js 15 App Router**, **React 19**, **Tailwind CSS**, dan **Prisma ORM**. Platform ini mengintegrasikan ekosistem agen AI otonom untuk rekayasa perangkat lunak dan operasional harian.
+Aplikasi ini adalah platform blog modern berbasis **Next.js 15 App Router**, **React 19**, **Tailwind CSS**, dan **Prisma ORM**. Platform ini mengintegrasikan ekosistem agen AI otonom untuk rekayasa perangkat lunak dan operasional harian, dilengkapi **Pencarian Full-Text**, **Toggle Dark/Light Mode**, dan **Sistem Autentikasi Admin Terproteksi**.
 
 ```mermaid
 flowchart LR
     Reader["Pembaca (Public User)"] --> Public_UI["Public Blog (/)"]
-    Admin["Pengelola (Admin/Author)"] --> Admin_UI["Admin CMS (/admin)"]
+    Admin["Pengelola (Admin/Author)"] --> Login["/admin/login"]
+    Login --> Admin_UI["Admin CMS (/admin)"]
     Agents["Agen Otonom (Cron/CLI)"] --> Database[("Prisma SQLite DB")]
     Public_UI --> Database
     Admin_UI --> Database
@@ -41,15 +44,24 @@ flowchart LR
 
 ## 2. Panduan Pembaca (Public Blog Interface)
 
-### Navigasi Beranda
-- Buka alamat utama aplikasi: `http://localhost:3000/`.
-- Di bagian atas, Anda akan menemukan **Navbar** dengan tautan navigasi ke **Beranda** dan tombol akses **Admin Hub**.
-- **Hero Section** menampilkan pengantar blog dan topik utama seputar rekayasa perangkat lunak dan arsitektur AI.
-- **Grid Artikel Terbaru** menampilkan daftar seluruh artikel yang telah dipublikasikan (`status: published`), lengkap dengan:
-  - Label Tag/Kategori (misal: `#Next.js`, `#Multi-Agent AI`).
-  - Tanggal publikasi terformat.
-  - Estimasi waktu baca (*reading time*).
-  - Ringkasan singkat (*excerpt*).
+### Navigasi Beranda & Toggle Tema (Dark/Light Mode)
+- Kunjungi `http://localhost:3000/`.
+- **Toggle Tema (Dark / Light Mode)**:
+  - Di sudut kanan atas pada Navbar, terdapat tombol ikon Matahari/Bulan.
+  - Klik tombol tersebut untuk beralih antara mode gelap (*dark mode*) dan mode terang (*light mode*).
+  - Pilihan tema Anda akan otomatis tersimpan di peramban (*localStorage*) sehingga tema tetap konsisten saat berpindah halaman.
+- **Tautan Navigasi**: Terdapat tautan ke **Beranda**, tombol **Admin**, dan tautan ke repositori GitHub.
+
+### Pencarian Artikel & Filter Tag (Full-Text Search)
+Pada bagian atas beranda (*Hero Section*), tersedia kotak pencarian interaktif:
+1. **Pencarian Kata Kunci**:
+   - Ketikkan topik yang dicari (misal: `Server Actions`, `Architecture`, `Testing`) lalu tekan tombol **Enter** atau klik **"Cari"**.
+   - Sistem akan melakukan pencarian teks penuh (*full-text search*) mencocokkan judul, ringkasan, dan isi konten artikel.
+2. **Filter Berdasarkan Tag**:
+   - Klik salah satu badge tag di bawah kotak pencarian (misal `#Next.js` atau `#Multi-Agent AI`).
+   - Sistem akan memfilter daftar artikel yang memiliki tag tersebut secara instan.
+3. **Reset Pencarian**:
+   - Klik tombol **"Reset Filter"** atau tombol silang (x) di dalam kolom input untuk kembali menampilkan seluruh artikel.
 
 ### Membaca Artikel
 1. Klik judul artikel atau tombol **"Baca →"** pada kartu artikel untuk membuka halaman detail (`/posts/[slug]`).
@@ -78,12 +90,18 @@ Di bagian bawah setiap artikel, terdapat area **Diskusi**:
 
 Dashboard CMS Admin adalah pusat kendali bagi pemilik blog untuk menulis, mengedit, mempublikasikan artikel, dan memoderasi interaksi komunitas pembaca.
 
-### Mengakses Dashboard Admin
-- Klik tautan **"Admin Hub"** di navigasi kanan atas pada navbar publik, atau langsung kunjungi:
-  ```text
-  http://localhost:3000/admin
-  ```
-- *Catatan Akses*: Rute ini dirancang untuk produksi internal lokal sehingga dapat langsung diakses tanpa form login yang rumit.
+### Sistem Autentikasi & Login Admin
+Rute `/admin` dan API Admin diproteksi oleh sistem autentikasi session berbasis cookie HTTP-Only:
+1. Kunjungi `http://localhost:3000/admin`.
+2. Jika Anda belum masuk, sistem akan secara otomatis mengarahkan Anda ke halaman login:
+   ```text
+   http://localhost:3000/admin/login
+   ```
+3. **Kredensial Default**:
+   - **Username**: `admin`
+   - **Password**: `admin123`
+   *(Kredensial dapat disesuaikan pada berkas `.env` melalui variabel `ADMIN_USERNAME` dan `ADMIN_PASSWORD`)*.
+4. Klik **"Masuk ke Dashboard"**. Setelah berhasil, Anda akan dialihkan langsung ke dashboard admin.
 
 ---
 
@@ -93,7 +111,7 @@ Di halaman admin, pilih tab **"Manajemen Artikel"**:
 
 ```mermaid
 flowchart TD
-    A["Buka /admin"] --> B{"Pilih Aksi Artikel"}
+    A["Login ke /admin"] --> B{"Pilih Aksi Artikel"}
     B -->|Artikel Baru| C["Form PostEditor (Live Preview)"]
     B -->|Ubah Status| D["Klik Badge Status (Draft / Published)"]
     B -->|Edit Artikel| E["Edit Konten & Tag"]
@@ -157,6 +175,10 @@ Pada setiap baris komentar, tersedia tombol aksi:
 4. Klik **"Kirim Balasan"**.
 5. Sistem akan menyimpan tanggapan Anda dengan penanda `isAuthorReply: true`, sehingga pada halaman publik balasan tersebut otomatis memiliki lencana resmi **Author Bot**.
 
+### Keluar dari Sesi Admin (Logout)
+- Untuk mengakhiri sesi admin, klik tombol **"Logout"** (berwarna merah) di sudut kanan atas header dashboard admin.
+- Sistem akan menghapus cookie sesi dan mengarahkan kembali ke halaman login `/admin/login`.
+
 ---
 
 ## 4. Panduan Agen Operasional Mandiri (Autonomous Agents)
@@ -170,22 +192,7 @@ Aplikasi dilengkapi dua agen AI yang dapat bekerja mandiri di latar belakang:
   npm.cmd run agent:content
   ```
 - **Menambahkan Topik ke Backlog**:
-  Buka berkas `content/backlog.json` dan tambahkan objek baru dengan status `"READY"`:
-  ```json
-  {
-    "id": "topic-4",
-    "title": "Praktik Terbaik Pengamanan API dengan Zod dan Rate Limiting",
-    "category": "Web Security",
-    "tags": ["Security", "Zod", "NodeJS"],
-    "targetAudience": "Backend Developer",
-    "keyTakeaways": [
-      "Pola sanitasi masukan string",
-      "Pencegahan payload injection",
-      "Implementasi rate limiting sederhana"
-    ],
-    "status": "READY"
-  }
-  ```
+  Buka berkas `content/backlog.json` dan tambahkan objek baru dengan status `"READY"`.
 
 ### Comment Responder Agent (Auto-Reply & Moderasi)
 - **Fungsi**: Memindai komentar yang disetujui namun belum memiliki balasan author, menganalisis isi pertanyaan pembaca, dan membuat balasan kontekstual secara otomatis.
@@ -209,32 +216,19 @@ Jika Anda menggunakan Google Antigravity, Anda dapat menjadwalkan kedua agen ter
 
 ## 5. Troubleshooting & FAQ
 
-### Q1: Database SQLite saya terkunci (*database is locked*) saat pengujian?
+### Q1: Lupa password login admin?
+**Solusi**: Password admin dikonfigurasi melalui berkas `.env` pada variabel `ADMIN_PASSWORD`. Nilai default adalah `admin123`. Anda dapat mengubahnya kapan saja di file `.env`.
+
+### Q2: Database SQLite saya terkunci (*database is locked*) saat pengujian?
 **Penyebab**: SQLite membatasi operasi tulis konkuren dalam waktu yang bersamaan.  
 **Solusi**: Pastikan tidak ada skrip CLI yang sedang berjalan saat menjalankan test suite. Skrip pengujian telah dioptimalkan untuk menutup koneksi Prisma secara teratur setelah eksekusi selesai.
 
-### Q2: Mengapa komentar baru saya tidak langsung muncul di artikel publik?
-**Penyebab**: Jika komentar mengandung kata yang mencurigakan, status komentar akan otomatis ditetapkan sebagai `PENDING` atau `SPAM`.  
-**Solusi**: Buka `http://localhost:3000/admin`, pilih tab **Moderasi Komentar**, lalu klik tombol **Setujui** pada komentar tersebut.
-
-### Q3: Bagaimana cara mengubah basis data ke PostgreSQL?
-1. Buka berkas `prisma/schema.prisma`.
-2. Ubah blok datasource:
-   ```prisma
-   datasource db {
-     provider = "postgresql"
-     url      = env("DATABASE_URL")
-   }
-   ```
-3. Sesuaikan variabel `DATABASE_URL` pada berkas `.env` dengan kredensial PostgreSQL Anda (misalnya PostgreSQL di Laragon atau Supabase/Neon).
-4. Jalankan perintah migrasi:
-   ```powershell
-   npm.cmd run db:push
-   ```
+### Q3: Mengapa artikel saya tidak muncul saat dicari di Search Bar?
+**Penyebab**: Kotak pencarian hanya menampilkan artikel yang berstatus `published: true`. Jika artikel masih berupa `Draf`, artikel hanya akan terlihat di Dashboard Admin (`/admin`).
 
 ### Q4: Bagaimana cara menjalankan pengujian mandiri (*self-test*)?
 Jalankan perintah berikut pada terminal PowerShell:
 ```powershell
 npm.cmd run test
 ```
-Seluruh 104 pengujian otomatis akan diverifikasi dalam hitungan detik.
+Seluruh 108 pengujian otomatis akan diverifikasi dalam hitungan detik.
