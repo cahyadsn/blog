@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calendar, Clock, ArrowRight } from "lucide-react";
+import { Calendar, Clock, ArrowRight, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -12,6 +12,7 @@ export interface PostCardProps {
     readingTime: number;
     publishedAt: string | Date;
     tags: { tag: { name: string; slug: string } }[];
+    likes?: number;
     _count?: {
       comments: number;
     };
@@ -37,7 +38,7 @@ export function PostCard({ post }: PostCardProps) {
         </div>
 
         <Link href={`/posts/${post.slug}`} className="block">
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors line-clamp-2">
             {post.title}
           </h2>
         </Link>
@@ -47,7 +48,7 @@ export function PostCard({ post }: PostCardProps) {
         </p>
 
         <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
               {formattedDate}
@@ -55,6 +56,10 @@ export function PostCard({ post }: PostCardProps) {
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
               {post.readingTime} mnt baca
+            </span>
+            <span className="flex items-center gap-1 text-rose-500 dark:text-rose-400 font-medium">
+              <Heart className="w-3.5 h-3.5 fill-rose-500/20 text-rose-500" />
+              {post.likes ?? 0}
             </span>
           </div>
 

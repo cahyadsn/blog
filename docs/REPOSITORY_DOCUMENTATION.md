@@ -68,6 +68,7 @@ Menyimpan seluruh artikel blog publik maupun draf internal.
 - `content`: String (Isi artikel dalam format Markdown)
 - `coverImage`: String? (Opsional)
 - `published`: Boolean (`@default(true)`)
+- `likes`: Int (`@default(0)`) -> Akumulasi tanda suka / apresiasi pembaca
 - `readingTime`: Int (`@default(3)`)
 - `publishedAt`: DateTime (`@default(now())`, Indexed)
 - `createdAt` & `updatedAt`: DateTime
@@ -92,6 +93,13 @@ Mengelola kategorisasi artikel.
 - `Tag`: `id`, `name` (Unique), `slug` (Unique).
 - `PostTag`: Tabel perantara (`postId`, `tagId`) dengan composite primary key `@@id([postId, tagId])`.
 
+### D. Model `Subscriber`
+Menyimpan data pelanggan buletin teknis (newsletter).
+- `id`: String (Primary Key, `@default(cuid())`)
+- `email`: String (Unique, Indexed, Case-normalized)
+- `active`: Boolean (`@default(true)`) -> Status keaktifan langganan
+- `createdAt`: DateTime (`@default(now())`)
+
 ---
 
 ## 3. Spesifikasi API Endpoints
@@ -102,7 +110,15 @@ Mengelola kategorisasi artikel.
 |---|---|---|---|
 | `GET` | `/api/posts` | Mengambil seluruh artikel yang berstatus `published: true` | `200 OK` |
 | `POST` | `/api/posts` | Membuat artikel baru melalui payload terstruktur | `201 Created` / `400 Bad Request` |
+| `GET` | `/api/posts/[id]/like` | Mengambil jumlah total tanda suka artikel (by CUID atau slug) | `200 OK` / `404 Not Found` |
+| `POST` | `/api/posts/[id]/like` | Menambahkan tanda suka secara atomik dengan proteksi rate limit | `200 OK` / `429 Too Many Requests` |
 | `POST` | `/api/comments` | Mengirim komentar pembaca dengan filter spam otomatis | `201 Created` / `400 Bad Request` |
+| `POST` | `/api/newsletter/subscribe` | Berlangganan newsletter dengan validasi Zod & deduplikasi idempoten | `200 OK` / `400 Bad Request` |
+| `GET` | `/sitemap.xml` | Peta situs XML dinamis berstandar Sitemaps 0.9 (isolasi draf) | `200 OK (application/xml)` |
+| `GET` | `/robots.txt` | Aturan perayapan mesin pencari (memblokir rute `/admin`) | `200 OK (text/plain)` |
+| `GET` | `/feed.xml` | Sindikasi RSS 2.0 Feed lengkap dengan RFC 822 pubDate | `200 OK (application/xml)` |
+| `GET` | `/opengraph-image` | Pembuat kartu sosial dinamis Satori untuk Beranda (1200x630) | `200 OK (image/png)` |
+| `GET` | `/posts/[slug]/opengraph-image` | Pembuat kartu sosial dinamis Satori per artikel (1200x630) | `200 OK (image/png)` |
 
 #### Format Payload Pembuatan Komentar Publik (`POST /api/comments`):
 ```json
@@ -131,6 +147,9 @@ Mengelola kategorisasi artikel.
 | `PATCH` | `/api/admin/comments/[id]` | Memperbarui status komentar (`APPROVED` atau `SPAM`) | Admin |
 | `DELETE` | `/api/admin/comments/[id]` | Menghapus komentar dari database | Admin |
 | `POST` | `/api/admin/comments/[id]/reply`| Mengirim balasan langsung berstatus `isAuthorReply: true` | Admin |
+| `GET` | `/api/admin/subscribers` | Mengambil daftar pelanggan newsletter dengan filter status dan pencarian | Admin |
+| `PATCH` | `/api/admin/subscribers/[id]` | Mengubah status aktif/nonaktif langganan | Admin |
+| `DELETE` | `/api/admin/subscribers/[id]` | Menghapus data pelanggan dari basis data | Admin |
 
 ---
 
@@ -161,7 +180,7 @@ src/
 
 ## 5. Infrastruktur Pengujian (Testing Infrastructure)
 
-Pengujian diotomatisasi menggunakan **Vitest** dan mencakup 6 berkas uji dengan total **104 test cases (100% lulus)**:
+Pengujian diotomatisasi menggunakan **Vitest** dan mencakup 14 berkas uji dengan total **236 test cases (100% lulus)**:
 
 ```powershell
 npx.cmd vitest run
@@ -188,6 +207,32 @@ npx.cmd vitest run
    - Kalkulasi akurat estimasi waktu membaca artikel (200 kata per menit).
    - Pembuatan slug ramah SEO dari teks judul Indonesia.
    - Konversi Markdown ke HTML terformat.
+7. `tests/auth.test.ts` (4 tests):
+   - Verifikasi pembuatan token HMAC Web Crypto, verifikasi otentikasi session cookie, dan invalidasi logout.
+8. `tests/seo.test.ts` (35 tests):
+   - Resolusi base URL dinamis dan pembersihan trailing slash.
+   - Format XML Sitemap dan kepatuhan isolasi draf (draf tidak terindeks).
+   - Aturan direktif crawler robots.txt (pemblokiran rute admin).
+   - Format RSS 2.0 Feed lengkap dengan penanggalan RFC 822.
+   - Tag metadata Open Graph & Twitter Cards pada layout dasar dan halaman detail artikel.
+9. `tests/likes-api.test.ts` (16 tests):
+   - Penambahan suka secara atomik (`increment`) by ID atau slug.
+   - Pembatasan laju (*sliding-window rate limiting*) dan respon HTTP 429 `Retry-After`.
+   - Validasi keberadaan artikel dan penanganan error 404.
+10. `tests/newsletter.test.ts` (13 tests):
+    - Validasi format email Zod dan pembersihan whitespace/lowercase.
+    - Pencegahan duplikasi email secara idempoten (status 200 dengan indikator `alreadySubscribed`).
+    - Reaktivasi otomatis jika pelanggan berstatus non-aktif sebelumnya.
+11. `tests/admin-subscribers.test.ts` (12 tests):
+    - Pengambilan daftar pelanggan dengan filter status aktif/nonaktif dan pagination.
+    - Toggle status keaktifan pelanggan newsletter oleh admin.
+    - Penghapusan data pelanggan secara aman.
+12. `tests/challenger-likes-stress.test.ts` (13 tests):
+    - Pengujian stres konkurensi klik Like bertubi-tubi dan verifikasi debouncing.
+13. `tests/challenger-newsletter-stress.test.ts` (22 tests):
+    - Pengujian adversarial penanganan masukan email newsletter (Unicode, domain unik, payload panjang).
+14. `tests/challenger-2-verification.test.ts` (17 tests):
+    - Verifikasi empiris pembentukan kartu sosial pratinjau dinamis Satori OG Image.
 
 ---
 

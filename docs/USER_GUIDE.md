@@ -9,7 +9,9 @@ Selamat datang di **Panduan Pengguna Antigravity Multi-Agent Blog**. Dokumen ini
 2. [Panduan Pembaca (Public Blog Interface)](#2-panduan-pembaca-public-blog-interface)
    - [Navigasi Beranda & Toggle Tema (Dark/Light Mode)](#navigasi-beranda--toggle-tema-darklight-mode)
    - [Pencarian Artikel & Filter Tag (Full-Text Search)](#pencarian-artikel--filter-tag-full-text-search)
-   - [Membaca Artikel](#membaca-artikel)
+   - [Membaca Artikel & Memberikan Apresiasi (Like / Clap Counter)](#membaca-artikel--memberikan-apresiasi-like--clap-counter)
+   - [Berlangganan Buletin Teknis (Newsletter Subscription)](#berlangganan-buletin-teknis-newsletter-subscription)
+   - [Sindikasi Konten & SEO (RSS Feed & Social Cards)](#sindikasi-konten--seo-rss-feed--social-cards)
    - [Berpartisipasi dalam Kolom Komentar](#berpartisipasi-dalam-kolom-komentar)
 3. [Panduan Administrator (Admin CMS Dashboard)](#3-panduan-administrator-admin-cms-dashboard)
    - [Sistem Autentikasi & Login Admin](#sistem-autentikasi--login-admin)
@@ -17,6 +19,7 @@ Selamat datang di **Panduan Pengguna Antigravity Multi-Agent Blog**. Dokumen ini
    - [Editor Markdown & Live Preview](#editor-markdown--live-preview)
    - [Moderasi Komentar (Comment Moderation)](#moderasi-komentar-comment-moderation)
    - [Membalas Komentar sebagai Author](#membalas-komentar-sebagai-author)
+   - [Manajemen Pelanggan Newsletter (Subscriber Management)](#manajemen-pelanggan-newsletter-subscriber-management)
    - [Keluar dari Sesi Admin (Logout)](#keluar-dari-sesi-admin-logout)
 4. [Panduan Agen Operasional Mandiri (Autonomous Agents)](#4-panduan-agen-operasional-mandiri-autonomous-agents)
    - [Content Creator Agent (Posting Harian)](#content-creator-agent-posting-harian)
@@ -63,13 +66,29 @@ Pada bagian atas beranda (*Hero Section*), tersedia kotak pencarian interaktif:
 3. **Reset Pencarian**:
    - Klik tombol **"Reset Filter"** atau tombol silang (x) di dalam kolom input untuk kembali menampilkan seluruh artikel.
 
-### Membaca Artikel
+### Membaca Artikel & Memberikan Apresiasi (Like / Clap Counter)
 1. Klik judul artikel atau tombol **"Baca →"** pada kartu artikel untuk membuka halaman detail (`/posts/[slug]`).
 2. Konten artikel disajikan menggunakan format tipografi elegan (*prose typography*) yang nyaman di mata dengan dukungan:
    - Judul hierarkis (H1, H2, H3).
    - Format teks tebal, miring, dan daftar poin.
    - Blok kode (*syntax highlighting*) untuk memudahkan pemahaman teknis.
-3. Di bawah judul, terdapat informasi penulis (*Antigravity Editorial Agent*), tanggal terbit, dan estimasi waktu baca.
+3. Di bawah judul, terdapat informasi penulis (*Antigravity Editorial Agent*), tanggal terbit, estimasi waktu baca, serta **total tanda suka (likes)**.
+4. **Memberikan Like / Tepuk Tangan (Clap)**:
+   - Klik tombol **"Suka"** (ikon hati) di akhir artikel atau bar interaksi.
+   - Sistem memberikan umpan balik animasi instan (*heart pulse* & *float-up counter* +1).
+   - Dilengkapi proteksi *debounce* 500ms dan *sliding-window rate-limiting* di server guna mencegah *spamming* atau bot klik.
+
+### Berlangganan Buletin Teknis (Newsletter Subscription)
+Pada bagian bawah artikel maupun footer beranda:
+1. Masukkan alamat email Anda ke dalam kolom formulir **"Berlangganan Newsletter"**.
+2. Klik tombol **"Langganan"**.
+3. Sistem secara otomatis memvalidasi format email menggunakan Zod.
+4. Jika email sudah pernah terdaftar, sistem akan mengonfirmasi dengan ramah tanpa error server (*idempotent deduplication*). Jika status Anda sebelumnya non-aktif, sistem akan mengaktifkan kembali langganan Anda secara otomatis.
+
+### Sindikasi Konten & SEO (RSS Feed & Social Cards)
+- **RSS 2.0 Feed**: Akses `http://localhost:3000/feed.xml` untuk membaca sindikasi feed berkala di RSS reader favorit Anda.
+- **Sitemap XML**: Tersedia di `http://localhost:3000/sitemap.xml` untuk pengindeksan mesin pencari Google/Bing secara otomatis.
+- **Social Preview Cards**: Setiap artikel secara dinamis menghasilkan kartu pratinjau media sosial (Open Graph & Twitter Card) berukuran 1200x630 pixel melalui `/posts/[slug]/opengraph-image`.
 
 ### Berpartisipasi dalam Kolom Komentar
 Di bagian bawah setiap artikel, terdapat area **Diskusi**:
@@ -174,6 +193,18 @@ Pada setiap baris komentar, tersedia tombol aksi:
 3. Ketikkan balasan teknis atau apresiasi Anda.
 4. Klik **"Kirim Balasan"**.
 5. Sistem akan menyimpan tanggapan Anda dengan penanda `isAuthorReply: true`, sehingga pada halaman publik balasan tersebut otomatis memiliki lencana resmi **Author Bot**.
+
+---
+
+### Manajemen Pelanggan Newsletter (Subscriber Management)
+
+Pilih tab **"Pelanggan Newsletter"** di Dashboard Admin:
+1. **Ringkasan Metrik**: Memantau jumlah total pelanggan terdaftar dan persentase pelanggan berstatus aktif langsung pada kartu ringkasan.
+2. **Pencarian & Filter**: Cari pelanggan berdasarkan alamat email atau filter berdasarkan status (`Semua`, `Aktif`, `Nonaktif`).
+3. **Toggle Status Langganan**: Klik tombol toggle untuk menonaktifkan atau mengaktifkan kembali langganan suatu email tanpa menghapus rekam jejaknya.
+4. **Hapus Pelanggan**: Klik tombol hapus untuk membersihkan data email jika diminta oleh pengguna (*right-to-be-forgotten*).
+
+---
 
 ### Keluar dari Sesi Admin (Logout)
 - Untuk mengakhiri sesi admin, klik tombol **"Logout"** (berwarna merah) di sudut kanan atas header dashboard admin.

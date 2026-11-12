@@ -2,7 +2,7 @@
 
 A modern, production-grade, full-stack blog application engineered and maintained by an **autonomous Multi-Agent System** using **Google Antigravity**, **Next.js 15 (App Router)**, **React 19**, **Tailwind CSS**, and **Prisma ORM**.
 
-Now featuring **Full-Text Article Search**, **Interactive Dark/Light Mode**, and **Protected Admin Authentication**, alongside the complete **Admin CMS Dashboard** and autonomous operations.
+Now featuring **Interactive Like/Clap Counter**, **Newsletter Subscription Suite**, **SEO & RSS Syndication**, **Full-Text Article Search**, **Interactive Dark/Light Mode**, and **Protected Admin Authentication**, alongside the complete **Admin CMS Dashboard** and autonomous operations.
 
 ---
 
@@ -61,7 +61,7 @@ flowchart TD
 | **Database Agent** | Relational schema modeling & migrations | On-demand | `prisma/schema.prisma`, `prisma/seed.ts`, `src/lib/db.ts` |
 | **Backend API Agent** | Auth logic, Admin API, Zod validation | On-demand | `src/app/api/*`, `src/app/api/admin/*`, `src/lib/auth.ts`, `src/middleware.ts` |
 | **Frontend UI/UX Agent** | Public blog, SearchBar, Admin CMS, Live Preview | On-demand | `src/app/page.tsx`, `SearchBar.tsx`, `src/app/admin/*`, `src/components/admin/*` |
-| **Unit Testing Agent** | Vitest test suites & lifecycle verification | CI / Pre-commit | `tests/*` (**108/108 tests passing 100%**) |
+| **Unit Testing Agent** | Vitest test suites & lifecycle verification | CI / Pre-commit | `tests/*` (**236/236 tests passing 100%**) |
 | **Technical Writer Agent** | User guides, API specifications & repository docs | On-demand / Release | `docs/USER_GUIDE.md`, `docs/REPOSITORY_DOCUMENTATION.md` |
 | **DevOps Agent** | Git version control & GitHub Actions CI/CD | Push / Pull Request | `.github/workflows/ci.yml` |
 | **Content Creator Agent** | Generates in-depth tech articles from backlog | Scheduled (`0 8 * * *`) | `scripts/daily-content.ts`, `content/backlog.json` |
@@ -71,7 +71,14 @@ flowchart TD
 
 ## ⚡ Features & Capabilities
 
-### 1. Reader Blog Interface
+### 1. Reader Blog Interface & Engagement
+- **Interactive Like / Clap Counter**: Optimistic client-side feedback with heart-pulse and float-up animations, 500ms debouncing, sliding-window rate limiting on the backend (`POST /api/posts/[id]/like`), and real-time like counts on cards and post headers.
+- **Newsletter Subscription System**: Elegant subscription form (`NewsletterForm.tsx`) with instant Zod email validation, idempotent deduplication, and automatic reactivation for returning subscribers (`POST /api/newsletter/subscribe`).
+- **SEO & RSS Syndication Suite**:
+  - Dynamic XML Sitemap (`/sitemap.xml`) with automatic draft isolation.
+  - Search engine crawler directives (`/robots.txt`).
+  - RSS 2.0 Feed syndication (`/feed.xml`) with RFC 822 publication dates.
+  - Dynamic Open Graph & Twitter Cards with on-the-fly Satori social preview image generation (`/opengraph-image`, `/posts/[slug]/opengraph-image`).
 - **Interactive Dark/Light Mode**: Smooth theme toggling saved in `localStorage` with zero flash of unstyled content.
 - **Full-Text Article Search**: Instant search bar querying titles, excerpts, and markdown content, paired with quick tag filter chips.
 - **Dynamic Prose Renderer**: Native markdown parsing with custom syntax highlighting and reading time indicator.
@@ -86,6 +93,9 @@ flowchart TD
   - **Interactive Live Markdown Preview**: Split-pane or toggleable real-time preview of formatted text and code blocks.
   - **Publish Status Toggle**: Switch between `Draft` and `Published` instantly.
   - **SEO & Metadata**: Auto slug generation from title, reading time estimation, and tag management.
+- **Subscriber Management Center**:
+  - View subscriber counts and metrics directly on the dashboard.
+  - Tab khusus manajemen pelanggan (`SubscriberList.tsx`) dengan filter status, pencarian email, toggle aktif/nonaktif, dan hapus pelanggan.
 - **Comment Moderation Center**:
   - Filter by status: `PENDING`, `APPROVED`, `SPAM`.
   - Quick action buttons: **Approve**, **Mark as Spam**, **Delete**.
@@ -108,7 +118,7 @@ flowchart TD
 - **Data Validation & Sanitization**: [Zod](https://zod.dev/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Markdown Parser**: [Marked](https://marked.js.org/)
-- **Testing**: [Vitest](https://vitest.dev/) (108 automated test cases)
+- **Testing**: [Vitest](https://vitest.dev/) (236 automated test cases)
 - **CI/CD**: GitHub Actions
 
 ---

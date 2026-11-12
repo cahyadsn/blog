@@ -1,321 +1,295 @@
-# Handoff Report: Backend & Data Model Architecture Survey
+# Handoff Report: Requirement R2 (Newsletter Subscription Form & Management)
 
-**Explorer**: Explorer 2 (Backend & Data Model Architecture Explorer)  
-**Date**: 2026-11-09T03:10:00Z  
-**Working Directory**: `d:\c\blog\.agents\teamwork\explorer_survey_2\`  
-**Target Scope**: Backend architecture, Prisma schema, SQLite database, existing API routes, comment moderation, agent CLI tools, and Admin CMS backend requirements.
+**Date**: 2026-11-12  
+**Author**: Explorer Survey Agent 2  
+**Recipient**: Orchestrator & Implementation Agents  
+**Target Requirement**: R2 — Newsletter Subscription Form and Management (Next.js 15 Blog Application)
 
 ---
 
 ## 1. Observation
 
-### 1.1 Database Configuration & Prisma Schema
-- **Datasource & Database File**: `prisma/schema.prisma` lines 1–4 specifies provider `sqlite` with `DATABASE_URL=env("DATABASE_URL")`. File `.env` line 1 defines `DATABASE_URL="file:./dev.db"`. The SQLite database exists at `d:\c\blog\prisma\dev.db` (size: 73,728 bytes).
-- **Generator**: `prisma-client-js` using Prisma client `^6.4.1` (`package.json` line 17).
-- **Models (`prisma/schema.prisma`)**:
-  - **`Post`** (lines 10–28):
-    ```prisma
-    model Post {
-      id          String    @id @default(cuid())
-      title       String
-      slug        String    @unique
-      excerpt     String
-      content     String
-      coverImage  String?
-      published   Boolean   @default(true)
-      readingTime Int       @default(3)
-      publishedAt DateTime  @default(now())
-      createdAt   DateTime  @default(now())
-      updatedAt   DateTime  @updatedAt
+### 1.1 Baseline System & Build Health
+- **Test Suite Status**: Executed `npm.cmd test` (Vitest v5.1.0).
+  - Result: All 9 test files passed, 160 tests passed in 12.35s with zero regressions.
+- **Production Build Status**: Executed `npm.cmd run build` (Next.js 16.4.6 with Turbopack).
+  - Result: Compiled successfully in 19.0s, TypeScript typecheck passed in 13.8s, 13/13 static routes generated cleanly.
+- **Runtime Environment Note**: On Windows PowerShell, running bare `npm` or `npx` throws `PSSecurityException` due to execution policy on `npm.ps1`. All commands must use `npm.cmd` and `npx.cmd`.
 
-      tags        PostTag[]
-      comments    Comment[]
+### 1.2 Prisma Schema & Database Configuration
+- **File**: `prisma/schema.prisma` (lines 1–62)
+  - Datasource provider: `sqlite` with `DATABASE_URL="file:./dev.db"` (`.env` line 1).
+  - Current models: `Post`, `Tag`, `PostTag`, `Comment`.
+  - Database file: `prisma/dev.db` (existing SQLite database file).
+  - Schema migration workflow: `npm.cmd run db:push` (`prisma db push`), which synchronizes SQLite schema directly without migration files.
+  - Generator: `prisma-client-js` generating into `node_modules/@prisma/client`.
+- **Database Client**: `src/lib/db.ts` (lines 1–13)
+  - Exports singleton `db` instance (`globalForPrisma.prisma ?? new PrismaClient(...)`).
 
-      @@index([slug])
-      @@index([publishedAt])
-    }
-    ```
-  - **`Tag`** (lines 30–35):
-    ```prisma
-    model Tag {
-      id    String    @id @default(cuid())
-      name  String    @unique
-      slug  String    @unique
-      posts PostTag[]
-    }
-    ```
-  - **`PostTag`** (lines 37–44):
-    ```prisma
-    model PostTag {
-      postId String
-      tagId  String
-      post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-      tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-      @@id([postId, tagId])
-    }
-    ```
-    *Cascade delete*: Deleting a `Post` will cascade delete all associated `PostTag` entries.
-  - **`Comment`** (lines 46–62):
-    ```prisma
-    model Comment {
-      id            String    @id @default(cuid())
-      postId        String
-      post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-      authorName    String
-      authorEmail   String
-      content       String
-      status        String    @default("APPROVED") // APPROVED, PENDING, SPAM
-      isAuthorReply Boolean   @default(false)
-      parentId      String?
-      parent        Comment?  @relation("ThreadReplies", fields: [parentId], references: [id], onDelete: Cascade)
-      replies       Comment[] @relation("ThreadReplies")
-      createdAt     DateTime  @default(now())
-
-      @@index([postId])
-      @@index([status])
-    }
-    ```
-    *Cascade delete*: Deleting a `Post` will cascade delete its `Comment` records. Deleting a parent `Comment` will cascade delete all nested `replies`.
-    *Statuses*: SQLite does not support native enums, so `status` is a `String` with default `"APPROVED"`. Valid values in code are `"APPROVED"`, `"PENDING"`, `"SPAM"`.
-    *Self-relation*: `parentId` references `id` of `Comment` via relation name `"ThreadReplies"`. `isAuthorReply: true` indicates bot or admin/author replies.
-
-### 1.2 Existing API Endpoints
-- **`src/app/api/posts/route.ts`**:
-  - `GET`: Returns `{ success: true, posts }`. Line 9: filters strictly by `{ where: { published: true } }`. Drafts (`published: false`) cannot be retrieved via this endpoint.
-  - `POST`: Validates payload with `PostCreateSchema.parse(body)` (lines 25–26). Connects or creates `Tag` records using `connectOrCreate` on `PostTag` (lines 36–52). Sets `readingTime = calculateReadingTime(validatedData.content)`.
-  - Limitations: No endpoints exist for `GET /api/posts/[id]`, `PUT /api/posts/[id]`, `PATCH /api/posts/[id]`, or `DELETE /api/posts/[id]`.
-- **`src/app/api/comments/route.ts`**:
-  - `POST`: Validates payload with `CommentSchema.parse(body)` (line 8). Runs spam keyword detection (lines 11–14: `casino`, `slot`, `viagra`, `crypto giveaway`, `free money`, `http://spam`). If spam, sets `status: "SPAM"` and returns status 400. Otherwise creates with `status: "APPROVED"`, `isAuthorReply: false` (line 24) and returns status 201.
-  - Limitations: No `GET`, `PATCH` (status change), or `DELETE` endpoints exist.
-- **Server Actions**: Currently, there are no server action files (`src/app/actions` does not exist).
-- **Admin APIs**: Currently, there are no admin API route files (`src/app/api/admin` does not exist).
-
-### 1.3 Comment Moderation & Public Visibility
-- **Public Post Page (`src/app/posts/[slug]/page.tsx` lines 24–36)**:
-  ```typescript
-  comments: {
-    where: {
-      status: "APPROVED",
-      parentId: null, // top-level comments
-    },
-    include: {
-      replies: {
-        where: { status: "APPROVED" },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  }
+### 1.3 Layout, Footer & Article Page Hierarchy
+- **Global Layout**: `src/app/layout.tsx` (lines 57–64)
+  ```tsx
+  <body className="antialiased flex flex-col min-h-screen">
+    <Navbar />
+    <main className="flex-grow max-w-5xl mx-auto px-4 sm:px-6 w-full py-10">
+      {children}
+    </main>
+    <Footer />
+  </body>
   ```
-  Only comments with `status === "APPROVED"` are displayed to public readers. Any comment with status `"PENDING"` or `"SPAM"` is completely suppressed.
-- **Client Comment Component (`src/components/blog/CommentSection.tsx` lines 177–181, 218–222)**:
-  Renders an `Author Bot` or `Bot` badge when `isAuthorReply: true`.
+  `Footer` is rendered globally on all pages (Home, Article details, Admin).
+- **Footer Component**: `src/components/blog/Footer.tsx` (lines 1–16)
+  - Currently a minimal 16-line component containing copyright and agent names in a bordered container:
+    `footer className="mt-20 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 py-12"`.
+- **Article Detail Page**: `src/app/posts/[slug]/page.tsx` (lines 109–160)
+  - Renders back button, article header, article content (`prose prose-indigo dark:prose-invert`), and `<CommentSection postId={post.id} initialComments={post.comments} />`.
+  - Bottom section of article page is situated between the prose content (`div` line 152–155) and the comment section (`CommentSection` line 158).
 
-### 1.4 Agent Scripts & CLI Tools
-- **`scripts/daily-content.ts`** (`npm run agent:content`):
-  - Reads `content/backlog.json`. Finds first item with `status === "READY"`.
-  - Generates Markdown, calculates reading time, creates post with `published: true` via `prisma.post.upsert`.
-  - Updates backlog status to `"PUBLISHED"`.
-- **`scripts/reply-comments.ts`** (`npm run agent:comments`):
-  - Queries `prisma.comment.findMany` where:
-    ```typescript
-    where: {
-      isAuthorReply: false,
-      status: "APPROVED",
-      replies: {
-        none: {
-          isAuthorReply: true,
-        },
-      },
-    }
-    ```
-  - Generates auto-reply with `isAuthorReply: true`, `status: "APPROVED"`, `parentId: comment.id`, `postId: comment.postId`.
-- **Interoperability observation**:
-  1. The bot agent skips comments if any reply already has `isAuthorReply: true`. Thus, if an admin replies to a reader's comment, the autonomous agent will not generate duplicate replies.
-  2. The bot agent only processes `status: "APPROVED"`. Comments marked `SPAM` or left in `PENDING` are never touched by the agent.
-  3. Deleting or editing posts in the Admin CMS will not break `backlog.json` or subsequent script executions.
+### 1.4 Existing UI Components & Design System
+- **`src/components/ui/input.tsx`**: Input forwardRef with `label`, `error`, Tailwind focus rings (`focus:ring-indigo-500`), dark mode colors (`dark:bg-gray-800 dark:border-gray-700`).
+- **`src/components/ui/button.tsx`**: Button forwardRef with variants `primary` (`bg-indigo-600`), `secondary`, `outline`, `ghost`, `danger`, and sizes `sm`, `md`, `lg`.
+- **`src/components/ui/badge.tsx`**: Badge with variants `default`, `secondary`, `success`, `warning`, `danger`, `outline`.
+- **`src/components/ui/card.tsx`**: Card and CardContent primitives.
+- **Icons**: `lucide-react` is used throughout the codebase (`Mail`, `Send`, `CheckCircle2`, `AlertCircle`, `Loader2`, `Sparkles`, `RefreshCw`, `Users`, `Check`, `X`).
 
-### 1.5 Validation Schemas & Utilities
-- **`src/lib/validations.ts`**:
-  - `CommentSchema`: validates `postId`, `authorName` (2-60 chars), `authorEmail`, `content` (3-2000 chars, rejects `<script>` XSS), `parentId` (optional/nullable).
-  - `PostCreateSchema`: validates `title` (5-200 chars), `slug` (3-120 chars, regex `/^[a-z0-9-]+$/`), `excerpt` (10-300 chars), `content` (min 50 chars), `coverImage` (optional/nullable url), `tags` (string array).
-  - Note: `PostCreateSchema` does not include `published?: boolean`.
-- **`src/lib/markdown.ts`**:
-  - `calculateReadingTime(content: string): number`: 200 words/min, minimum 1 min.
-  - `parseMarkdownToHtml(markdownContent: string): Promise<string>`: uses `marked` with `gfm: true, breaks: true`.
-  - `generateSlug(title: string): string`: converts title to kebab-case alphanumeric slug.
+### 1.5 Validation & API Conventions
+- **Validation Library**: `zod` v4.6.7 in `src/lib/validations.ts`.
+  - Verified via Node: `z.string().trim().toLowerCase().email()` natively cleans whitespace, converts email to lowercase, and validates email syntax.
+- **API Structure**: `src/app/api/`
+  - Public routes: `src/app/api/comments/route.ts` and `src/app/api/posts/route.ts`.
+  - Admin routes: `src/app/api/admin/` protected by `src/middleware.ts` (lines 26–33: returns 401 if `verifySessionToken` fails).
+  - API response format: JSON with `{ success: boolean, ... }`, status codes 200, 201, 400, 401, 500.
 
-### 1.6 Build and Test Status
-- `npm.cmd test`: Ran Vitest v3.2.7. 2 test files, 9 tests total, all passed in 6.15s.
-- `npm.cmd run build`: Compiled Next.js 15.1.7 successfully with static page generation and type checking.
+### 1.6 Admin Dashboard Architecture
+- **File**: `src/app/admin/page.tsx` (lines 1–278)
+  - `AdminMetrics` state (lines 19–27): contains article and comment metrics.
+  - Metrics Grid (lines 137–224): 4 stat cards in `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4`.
+  - Tab Switcher (lines 226–276): state `activeTab: "posts" | "comments"` switching between `<PostList />` and `<CommentList />`.
+- **File**: `src/app/admin/layout.tsx` (lines 1–57)
+  - Header bar with title, protected mode badge, view blog button, and logout button.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Requirement R1 & R4**: The system requires an admin dashboard at `/admin` without authentication to manage articles and comments using existing Prisma models.
-2. **Post CRUD Gap Analysis**:
-   - Reading: The current `GET /api/posts` only returns published posts (`where: { published: true }`). The admin needs to view all posts, filterable by status (`all`, `published`, `draft`) and search terms.
-   - Creating: While `POST /api/posts` exists, it does not accept `published: false` (to save as draft) or custom `publishedAt`.
-   - Editing & Deleting: No endpoints or actions exist to fetch a single post by ID (`GET /api/admin/posts/[id]`), update an existing post (`PUT` or `PATCH`), toggle publication status (`PATCH`), or delete a post (`DELETE`).
-3. **PostTag Relation Update Logic**:
-   - In SQLite/Prisma, updating tags on an existing post requires clearing old `PostTag` entries for that post and re-creating new associations with `connectOrCreate` for `Tag`. This should be wrapped in a transaction:
-     ```typescript
-     await db.$transaction(async (tx) => {
-       await tx.postTag.deleteMany({ where: { postId: id } });
-       await tx.post.update({
-         where: { id },
-         data: {
-           ...postData,
-           tags: {
-             create: tagNames.map((name) => ({
-               tag: {
-                 connectOrCreate: {
-                   where: { name },
-                   create: { name, slug: generateSlug(name) },
-                 },
-               },
-             })),
-           },
-         },
-       });
+From the observations above, the technical requirements for R2 map directly into 4 clean, decoupled implementation modules:
+
+### 2.1 Prisma Schema & Database Layer
+1. **Observation**: `prisma/schema.prisma` is backed by SQLite (`prisma/dev.db`) and pushed via `npm.cmd run db:push`.
+2. **Deduction**: We must add the `Subscriber` model to `prisma/schema.prisma`:
+   ```prisma
+   model Subscriber {
+     id        String   @id @default(cuid())
+     email     String   @unique
+     active    Boolean  @default(true)
+     createdAt DateTime @default(now())
+     updatedAt DateTime @updatedAt
+
+     @@index([email])
+     @@index([active])
+   }
+   ```
+3. **Execution Command**:
+   ```powershell
+   npx.cmd prisma db push
+   ```
+   This will update `prisma/dev.db` with the `Subscriber` table and regenerate Prisma Client in `node_modules/@prisma/client`, giving full TypeScript autocomplete on `db.subscriber`.
+
+### 2.2 Zod Schema & Validation Layer
+1. **Observation**: `src/lib/validations.ts` contains all application input schemas (`CommentSchema`, `PostCreateSchema`, etc.).
+2. **Deduction**: Add `SubscriberSchema` to `src/lib/validations.ts`:
+   ```ts
+   export const SubscriberSchema = z.object({
+     email: z
+       .string({ required_error: "Alamat email wajib diisi" })
+       .trim()
+       .toLowerCase()
+       .email("Format alamat email tidak valid")
+       .max(150, "Alamat email terlalu panjang"),
+   });
+
+   export type SubscriberInput = z.infer<typeof SubscriberSchema>;
+   ```
+   This guarantees that casing issues (e.g. `User@EXAMPLE.COM` vs `user@example.com`) and trailing spaces are sanitized before database lookup.
+
+### 2.3 API Route Handlers
+
+#### Public API: `POST /api/newsletter/subscribe`
+1. **Observation**: Located at `src/app/api/newsletter/subscribe/route.ts`. Because it is outside `/api/admin/*`, it will not be intercepted by `src/middleware.ts` and is publicly accessible.
+2. **Handling Algorithm**:
+   - **Step 1**: Parse request body with `SubscriberSchema.safeParse(body)`. If validation fails, return HTTP 400:
+     `{ success: false, error: result.error.issues[0].message }`.
+   - **Step 2**: Query database for existing record:
+     `const existing = await db.subscriber.findUnique({ where: { email: validated.email } })`.
+   - **Step 3 (Already Active)**: If `existing && existing.active === true`, return HTTP 200 with informative message (no duplicate record created):
+     ```json
+     {
+       "success": true,
+       "alreadySubscribed": true,
+       "message": "Email Anda sudah terdaftar dalam newsletter kami.",
+       "subscriber": { "id": "...", "email": "...", "active": true, "createdAt": "..." }
+     }
+     ```
+   - **Step 4 (Reactivation)**: If `existing && existing.active === false`, reactivate subscription:
+     ```ts
+     const updated = await db.subscriber.update({
+       where: { email: validated.email },
+       data: { active: true },
      });
      ```
-4. **Slug Validation Logic**:
-   - Slugs must be unique (`@unique` constraint on `Post.slug`). When editing a post, updating the slug must verify that no *other* post has that slug (`where: { slug, NOT: { id } }`).
-   - If user does not provide a custom slug, `generateSlug(title)` should automatically populate it.
-5. **Comment Moderation Gap Analysis**:
-   - Reading: No API exists to list all comments across all statuses. Admin needs `GET /api/admin/comments?status=PENDING|APPROVED|SPAM|ALL`.
-   - Moderation: No API exists to change comment status (`PATCH /api/admin/comments/[id]` with `{ status: "APPROVED" | "SPAM" }`) or delete comments (`DELETE /api/admin/comments/[id]`).
-   - Author Reply: An admin reply requires creating a new comment with `postId: parentComment.postId`, `parentId: parentComment.id`, `isAuthorReply: true`, `status: "APPROVED"`, and author information (`authorName: "Admin"`, `authorEmail: "admin@blog.local"`).
-6. **Cascade Safety Verification**:
-   - In `prisma/schema.prisma`:
-     - `PostTag` has `onDelete: Cascade` on `postId`.
-     - `Comment` has `onDelete: Cascade` on `postId`.
-     - `Comment.parent` has `onDelete: Cascade` on `parentId`.
-   - Deleting a post safely removes all associated tags and comments without leaving orphaned records. Deleting a parent comment safely removes all its nested replies.
+     Return HTTP 200:
+     ```json
+     {
+       "success": true,
+       "reactivated": true,
+       "message": "Langganan newsletter Anda telah diaktifkan kembali!",
+       "subscriber": updated
+     }
+     ```
+   - **Step 5 (New Subscription)**: If `!existing`, create new record:
+     ```ts
+     const newSubscriber = await db.subscriber.create({
+       data: {
+         email: validated.email,
+         active: true,
+       },
+     });
+     ```
+     Return HTTP 201:
+     ```json
+     {
+       "success": true,
+       "message": "Terima kasih! Anda berhasil berlangganan newsletter kami.",
+       "subscriber": newSubscriber
+     }
+     ```
+   - **Step 6 (Race Condition Guard)**: In `catch (err: unknown)`, if Prisma throws code `P2002` (unique constraint violation during simultaneous requests), catch it and fetch the existing record to return status 200 with `alreadySubscribed: true`.
+
+#### Admin API: `GET /api/admin/subscribers` and `PATCH/DELETE`
+1. **Observation**: Admin needs subscriber data and metrics. `src/middleware.ts` protects `/api/admin/*`.
+2. **Endpoint**: `src/app/api/admin/subscribers/route.ts`
+   - `GET`: Returns `{ success: true, subscribers, metrics: { total, active, inactive } }`.
+   - Supports optional query parameters: `search` (filter email) and `status` (`ALL`, `ACTIVE`, `INACTIVE`).
+3. **Endpoint**: `src/app/api/admin/subscribers/[id]/route.ts`
+   - `PATCH`: Toggles `active` status (`{ active: boolean }`).
+   - `DELETE`: Permanently removes subscriber record.
+
+### 2.4 Frontend UI Components
+
+#### Component 1: `src/components/blog/NewsletterForm.tsx`
+1. **Observation**: Needs to be responsive, elegant, interactive, and match Tailwind + Lucide design language.
+2. **Design Specifications**:
+   - Header with `Mail` icon, bold title ("Berlangganan Newsletter"), and description ("Dapatkan kurasi artikel teknologi, AI, dan software engineering terbaik langsung ke inbox Anda.").
+   - Form with input (`type="email"`, placeholder `"nama@domain.com"`), Mail icon, and Submit button (`Button variant="primary"` with `Send` or `Sparkles` icon).
+   - In-flight state: `isLoading` disables input and button, shows spinner (`Loader2 className="animate-spin"`).
+   - Feedback alerts:
+     - Success banner: Emerald/Indigo container with `CheckCircle2` icon.
+     - Already Subscribed banner: Sky/Indigo container with `Check` or `Sparkles` icon ("Email Anda sudah terdaftar...").
+     - Error banner: Rose container with `AlertCircle` icon.
+   - Client-side validation: verifies email pattern before network request.
+   - Props: `variant?: "default" | "card"`:
+     - `"default"`: streamlined horizontal form suitable for `Footer.tsx`.
+     - `"card"`: card layout with badge and accent background suitable for the bottom section of `src/app/posts/[slug]/page.tsx`.
+
+#### Integration Points:
+1. **Footer Integration** (`src/components/blog/Footer.tsx`):
+   - Insert `<NewsletterForm />` in a dedicated section above the copyright bar.
+   - Because `Footer` is rendered globally in `src/app/layout.tsx`, the newsletter form is instantly available on the home page, every article page, and throughout the blog.
+2. **Article Bottom Section Integration** (`src/app/posts/[slug]/page.tsx`):
+   - Place `<NewsletterForm variant="card" />` directly after the article prose and before `<CommentSection />`.
+   - This provides maximum contextual relevance when a reader finishes an article and wants more content.
+
+#### Component 2: Admin Dashboard Integration
+1. **Overview Stat Cards (`src/app/admin/page.tsx`)**:
+   - Update `AdminMetrics` to include:
+     ```ts
+     totalSubscribers: number;
+     activeSubscribers: number;
+     ```
+   - Update `fetchMetrics()` to fetch `/api/admin/subscribers`.
+   - Add a 5th stat card (or 2-column community section):
+     - Card: "Pelanggan Newsletter" (Icon: `Mail` or `Users`), displaying `metrics.totalSubscribers`, subtext `${metrics.activeSubscribers} aktif`.
+2. **Admin Tab Switcher & Subscriber Management Table**:
+   - Add `"subscribers"` tab: `activeTab === "subscribers"`.
+   - Create `src/components/admin/SubscriberList.tsx`:
+     - Search filter input with `Search` icon.
+     - Status filter buttons: `Semua`, `Aktif`, `Tidak Aktif`.
+     - Data table displaying:
+       - Email
+       - Status badge (`Badge variant="success"` for Aktif, `variant="secondary"` for Nonaktif)
+       - Tanggal Berlangganan (Indonesian format: `12 Nov 2026`)
+       - Action buttons: Toggle Status (Nonaktifkan / Aktifkan) and Delete (`Trash2`).
+     - Empty state with friendly illustration/icon when no subscribers exist yet.
 
 ---
 
 ## 3. Caveats
 
-1. **Cover Image URL Validation**: In HTML forms, empty fields submit empty strings `""`. `z.string().url()` fails on empty strings. Validation must normalize `""` to `null` or accept optional/nullable strings.
-2. **Slug Collision Handling**: When an admin types a title, client-side slug auto-generation might match an existing slug in the database. The backend must return a friendly 409 Conflict error message ("Slug sudah digunakan oleh artikel lain") rather than a raw Prisma unique constraint error (`P2002`).
-3. **No Auth Security Boundary**: As specified in R1 ("tanpa proteksi autentikasi/login untuk lingkungan internal blog"), `/admin` and `/api/admin/*` are open for internal development. In a production external deployment, middleware-level authentication would be required.
-4. **Agent Concurrency**: If `npm run agent:comments` runs concurrently while an admin is actively moderating comments, SQLite file locking could occur if long transactions are held. All database operations should remain fast and atomic.
+1. **PowerShell Script Execution Policy**:
+   - Bare `npm` or `npx` fails with `SecurityError: PSSecurityException` on this Windows machine.
+   - Implementation scripts, tests, and build checks must explicitly execute `npm.cmd` and `npx.cmd`.
+2. **Process Locking During Build**:
+   - Next.js Turbopack locks the `.next` directory. Multiple simultaneous `next build` processes fail with `Another next build process is already running`. Always ensure prior build tasks terminate before running a new build.
+3. **Database Concurrency in SQLite**:
+   - SQLite uses file-level locking during writes. In high-concurrency environments, unique constraint collisions must be caught at the application level (Prisma error code `P2002`) to ensure duplicate submissions return an informative status 200 rather than an unhandled 500 error.
+4. **Scope Demarcation (Email Dispatch vs Subscription Collection)**:
+   - The user request R2 focuses on the subscription collection form, Zod validation, duplicate prevention, database persistence, and admin dashboard visualization. Real SMTP delivery or email sending service (e.g. Resend / SendGrid / Postmark) is not part of R2 and should not be added without external SMTP credentials.
 
 ---
 
-## 4. Conclusion & Concrete Recommendations
+## 4. Conclusion
 
-### 4.1 Recommended Route Handlers Architecture
-Implement dedicated admin endpoints under `src/app/api/admin/`:
-
-| Endpoint | Method | Purpose | Payload / Query | Response |
-|---|---|---|---|---|
-| `/api/admin/posts` | `GET` | List all posts for CMS | `?status=all\|published\|draft&search=...` | `{ success: true, posts: Post[] }` |
-| `/api/admin/posts` | `POST` | Create post (published or draft) | `PostAdminInput` | `{ success: true, post: Post }` (201) |
-| `/api/admin/posts/[id]` | `GET` | Get single post for editing | None | `{ success: true, post: PostWithTags }` |
-| `/api/admin/posts/[id]` | `PUT` | Update post fields & tags | `PostAdminInput` | `{ success: true, post: Post }` |
-| `/api/admin/posts/[id]` | `DELETE` | Delete post (cascading tags & comments) | None | `{ success: true, message: string }` |
-| `/api/admin/posts/[id]/publish` | `PATCH` | Quick toggle publish status | `{ published: boolean }` | `{ success: true, post: Post }` |
-| `/api/admin/comments` | `GET` | List comments by status | `?status=ALL\|PENDING\|APPROVED\|SPAM` | `{ success: true, comments: Comment[] }` |
-| `/api/admin/comments/[id]` | `PATCH` | Update comment status | `{ status: "APPROVED"\|"SPAM"\|"PENDING" }` | `{ success: true, comment: Comment }` |
-| `/api/admin/comments/[id]` | `DELETE` | Delete comment (cascading replies) | None | `{ success: true, message: string }` |
-| `/api/admin/comments/[id]/reply` | `POST` | Author/admin reply to comment | `{ content: string, authorName?: string }` | `{ success: true, comment: Comment }` (201) |
-
-### 4.2 Recommended Schema Additions in `src/lib/validations.ts`
-```typescript
-export const PostAdminSchema = z.object({
-  title: z.string().trim().min(5, "Judul minimal 5 karakter").max(200),
-  slug: z
-    .string()
-    .trim()
-    .min(3)
-    .max(120)
-    .regex(/^[a-z0-9-]+$/, "Slug hanya boleh berisi huruf kecil, angka, dan strip"),
-  excerpt: z.string().trim().min(10, "Ringkasan minimal 10 karakter").max(300),
-  content: z.string().trim().min(20, "Konten artikel minimal 20 karakter"),
-  coverImage: z
-    .string()
-    .trim()
-    .url("URL gambar tidak valid")
-    .optional()
-    .nullable()
-    .or(z.literal("")),
-  published: z.boolean().default(true),
-  tags: z.array(z.string()).default([]),
-});
-
-export const CommentStatusSchema = z.object({
-  status: z.enum(["APPROVED", "PENDING", "SPAM"]),
-});
-
-export const AdminReplySchema = z.object({
-  content: z.string().trim().min(2, "Balasan minimal 2 karakter").max(2000),
-  authorName: z.string().trim().min(2).default("Admin"),
-  authorEmail: z.string().trim().email().default("admin@blog.local"),
-});
-```
-
-### 4.3 Recommended Prisma Query Patterns
-- **Listing Posts with Comment Counts**:
-  ```typescript
-  const posts = await db.post.findMany({
-    where: {
-      ...(status === "published" ? { published: true } : {}),
-      ...(status === "draft" ? { published: false } : {}),
-      ...(search ? {
-        OR: [
-          { title: { contains: search } },
-          { slug: { contains: search } },
-        ],
-      } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: {
-      tags: { include: { tag: true } },
-      _count: { select: { comments: true } },
-    },
-  });
-  ```
-- **Author Reply Creation**:
-  ```typescript
-  const parentComment = await db.comment.findUnique({ where: { id } });
-  if (!parentComment) throw new Error("Comment not found");
-
-  const reply = await db.comment.create({
-    data: {
-      postId: parentComment.postId,
-      parentId: parentComment.id,
-      authorName: validated.authorName,
-      authorEmail: validated.authorEmail,
-      content: validated.content,
-      status: "APPROVED",
-      isAuthorReply: true,
-    },
-  });
-  ```
+The codebase is in an ideal state to implement Requirement R2 cleanly:
+1. **Prisma**: The SQLite schema is compact and ready for the `Subscriber` model via `npx.cmd prisma db push`.
+2. **Zod**: Zod 4.6.7 natively supports `.trim().toLowerCase().email()`, guaranteeing sanitized inputs.
+3. **UI System**: Tailwind CSS, Lucide icons, and reusable UI components (`Input`, `Button`, `Badge`, `Card`) provide an established foundation to create both the public `NewsletterForm` and the admin `SubscriberList`.
+4. **Admin CMS**: `src/app/admin/page.tsx` has a clean modular tab structure (`posts`, `comments`) that cleanly accommodates a 3rd tab (`subscribers`) alongside a subscriber metric summary card.
 
 ---
 
 ## 5. Verification Method
 
-1. **Verify Database Integrity**:
-   - Inspect models and relations in `prisma/schema.prisma`.
-   - Run `npx.cmd tsx prisma/seed.ts` to ensure database seeds clean test records.
-2. **Execute Test Suite**:
-   ```powershell
-   npm.cmd test
-   ```
-   *Expected result*: Vitest runs unit tests (existing 9 tests pass; any new route tests pass).
-3. **Execute Production Build**:
-   ```powershell
-   npm.cmd run build
-   ```
-   *Expected result*: Next.js build passes with exit code 0, TypeScript type check passes, and all new `/admin` routes compile cleanly.
-4. **Invalidation Conditions**:
-   - Deleting a post fails due to foreign key constraint violation (would invalidate cascade assumption).
-   - Author reply does not include `isAuthorReply: true` or correct `parentId` (would break comment threading and bot duplicate prevention).
-   - Draft posts appear in public homepage or public post detail page.
+To independently verify the implementation, follow these steps:
+
+### 5.1 Database Verification
+Run Prisma push and verify model reflection:
+```powershell
+npx.cmd prisma db push
+```
+Verify table creation with node query:
+```powershell
+node -e "const { db } = require('./src/lib/db'); db.subscriber.findMany().then(res => console.log('Subscribers in DB:', res)).finally(() => process.exit(0));"
+```
+
+### 5.2 Automated Vitest Test Suite
+Create a dedicated test file `tests/newsletter.test.ts` covering:
+1. **Email Format Validation**:
+   - Valid emails pass and are converted to lowercase.
+   - Invalid formats (`user@`, `plainaddress`, `@domain.com`, spaces) fail with Zod error message.
+2. **Duplicate Prevention**:
+   - First submission creates active subscriber and returns HTTP 201.
+   - Second submission with identical email (even with mixed case, e.g. `User@domain.com` vs `user@domain.com`) returns HTTP 200 with informative `alreadySubscribed` message and does not create duplicate record.
+3. **Reactivation Workflow**:
+   - Inactive subscriber submitting again is reactivated to `active: true` with status 200.
+4. **Admin API & Listing**:
+   - `GET /api/admin/subscribers` returns list and metrics.
+
+Run tests:
+```powershell
+npm.cmd test tests/newsletter.test.ts
+npm.cmd test
+```
+*Expected*: All test suites pass (160 existing + new newsletter tests) with 0 failures.
+
+### 5.3 Next.js Production Build Verification
+Execute the full production build:
+```powershell
+npm.cmd run build
+```
+*Expected*: Exit code 0, all routes compiled cleanly with zero TypeScript or lint errors.
+
+### 5.4 Invalidation Conditions
+- If duplicate email submission throws an unhandled HTTP 500 error instead of informative feedback.
+- If email is stored with mixed-casing allowing case-variant duplicates (e.g., `test@a.com` vs `TEST@a.com`).
+- If existing Vitest tests break or fail.
+- If Next.js build fails.

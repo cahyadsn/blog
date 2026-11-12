@@ -2,10 +2,33 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/blog/Navbar";
 import { Footer } from "@/components/blog/Footer";
+import { getBaseUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Antigravity Multi-Agent Blog",
+  metadataBase: new URL(getBaseUrl()),
+  title: {
+    default: "Antigravity Multi-Agent Blog",
+    template: "%s | Antigravity Multi-Agent Blog",
+  },
   description: "Aplikasi blog modern dengan ekosistem multi-agent mandiri",
+  openGraph: {
+    title: "Antigravity Multi-Agent Blog",
+    description: "Aplikasi blog modern dengan ekosistem multi-agent mandiri",
+    url: getBaseUrl(),
+    siteName: "Antigravity Multi-Agent Blog",
+    locale: "id_ID",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Antigravity Multi-Agent Blog",
+    description: "Aplikasi blog modern dengan ekosistem multi-agent mandiri",
+  },
+  alternates: {
+    types: {
+      "application/rss+xml": `${getBaseUrl()}/feed.xml`,
+    },
+  },
 };
 
 export default function RootLayout({

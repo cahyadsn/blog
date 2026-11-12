@@ -1,12 +1,69 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { parseMarkdownToHtml } from "@/lib/markdown";
 import { Badge } from "@/components/ui/badge";
 import { CommentSection } from "@/components/blog/CommentSection";
-import { Calendar, Clock, ChevronLeft, User } from "lucide-react";
+import { LikeButton } from "@/components/blog/LikeButton";
+import { Calendar, Clock, ChevronLeft, User, Heart } from "lucide-react";
 
 export const revalidate = 0; // dynamic
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+
+  const post = await db.post.findUnique({
+    where: { slug },
+    select: {
+      title: true,
+      slug: true,
+      excerpt: true,
+      coverImage: true,
+      published: true,
+      publishedAt: true,
+    },
+  });
+
+  if (!post || !post.published) {
+    return {
+      title: "Artikel Tidak Ditemukan",
+    };
+  }
+
+  const ogImageUrl = post.coverImage || `/posts/${post.slug}/opengraph-image`;
+
+  return {
+    title: post.title,
+    description: post.excerpt,
+    openGraph: {
+      title: post.title,
+      description: post.excerpt,
+      type: "article",
+      publishedTime: post.publishedAt.toISOString(),
+      authors: ["Antigravity Editorial Agent"],
+      url: `/posts/${post.slug}`,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: post.title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.excerpt,
+      images: [ogImageUrl],
+    },
+  };
+}
 
 export default async function PostDetailPage({
   params,
@@ -89,6 +146,11 @@ export default async function PostDetailPage({
             <Clock className="w-4 h-4" />
             {post.readingTime} menit baca
           </span>
+          <span>•</span>
+          <span className="flex items-center gap-1 text-rose-500 dark:text-rose-400 font-medium">
+            <Heart className="w-4 h-4 fill-rose-500/20 text-rose-500" />
+            {post.likes ?? 0} suka
+          </span>
         </div>
       </header>
 
@@ -97,6 +159,19 @@ export default async function PostDetailPage({
         className="prose prose-indigo dark:prose-invert max-w-none text-base leading-relaxed"
         dangerouslySetInnerHTML={{ __html: htmlContent }}
       />
+
+      {/* Bagian Interaktif Like / Clap Button */}
+      <div className="my-12 py-8 border-y border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 text-center">
+        <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-1">
+          Menyukai artikel ini? Berikan apresiasi Anda!
+        </p>
+        <LikeButton
+          postId={post.id}
+          slug={post.slug}
+          postSlug={post.slug}
+          initialLikes={post.likes ?? 0}
+        />
+      </div>
 
       {/* Kolom Komentar */}
       <CommentSection postId={post.id} initialComments={post.comments} />

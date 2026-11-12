@@ -16,6 +16,7 @@ model Post {
   coverImage  String?
   published   Boolean   @default(true)
   readingTime Int       @default(3)
+  likes       Int       @default(0)
   publishedAt DateTime  @default(now())
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -59,4 +60,13 @@ model Comment {
 
   @@index([postId])
   @@index([status])
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

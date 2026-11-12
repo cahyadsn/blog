@@ -82,3 +82,16 @@ export type PostAdminInput = z.infer<typeof PostAdminSchema>;
 export type CommentStatusInput = z.infer<typeof CommentStatusSchema>;
 export type AdminReplyInput = z.infer<typeof AdminReplySchema>;
 
+export const SubscriberSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Alamat email wajib diisi")
+    .email("Format alamat email tidak valid")
+    .max(100, "Alamat email terlalu panjang, maksimal 100 karakter")
+    .transform((val) => val.toLowerCase()),
+});
+
+export type SubscriberInput = z.infer<typeof SubscriberSchema>;
+
+

@@ -1,0 +1,47 @@
+--- a/tests/challenger-likes-stress.test.ts
++++ b/tests/challenger-likes-stress.test.ts
+@@ -39,7 +39,7 @@ describe("Challenger 1: Adversarial Stress Test Suite for Like/Clap Counter", ()
+-      vi.mocked(db.post.findFirst).mockImplementation(async () => ({
++      (vi.mocked(db.post.findFirst) as any).mockImplementation(async () => ({
+         id: TARGET_POST.id,
+         slug: TARGET_POST.slug,
+         likes: currentLikes,
+       } as any));
+ 
+-      vi.mocked(db.post.update).mockImplementation(async (args: any) => {
++      (vi.mocked(db.post.update) as any).mockImplementation(async (args: any) => {
+         const inc = args.data.likes.increment;
+         currentLikes += inc;
+         return { likes: currentLikes } as any;
+       });
+@@ -222,7 +222,7 @@ describe("Challenger 1: Adversarial Stress Test Suite for Like/Clap Counter", ()
+-      vi.mocked(db.post.findFirst).mockImplementation(async () => ({
++      (vi.mocked(db.post.findFirst) as any).mockImplementation(async () => ({
+         id: TARGET_POST.id,
+         slug: TARGET_POST.slug,
+         likes: persistentLikes,
+       } as any));
+ 
+-      vi.mocked(db.post.update).mockImplementation(async (args: any) => {
++      (vi.mocked(db.post.update) as any).mockImplementation(async (args: any) => {
+         const inc = args.data.likes.increment;
+         updateCalls.push(inc);
+         persistentLikes += inc;
+         return { likes: persistentLikes } as any;
+       });
+@@ -270,3 +270,3 @@ describe("Challenger 1: Adversarial Stress Test Suite for Like/Clap Counter", ()
+-      vi.mocked(db.post.update).mockImplementation(async (args: any) => {
++      (vi.mocked(db.post.update) as any).mockImplementation(async (args: any) => {
+         const inc = args.data.likes.increment;
+@@ -305,3 +305,3 @@ describe("Challenger 1: Adversarial Stress Test Suite for Like/Clap Counter", ()
+-      vi.mocked(db.post.findFirst).mockImplementation(async (args: any) => {
++      (vi.mocked(db.post.findFirst) as any).mockImplementation(async (args: any) => {
+         const orConditions = args.where.OR;
+@@ -315,3 +315,3 @@ describe("Challenger 1: Adversarial Stress Test Suite for Like/Clap Counter", ()
+-      vi.mocked(db.post.update).mockImplementation(async (args: any) => {
++      (vi.mocked(db.post.update) as any).mockImplementation(async (args: any) => {
+         updatedPostIds.push(args.where.id);
+@@ -445,3 +445,3 @@ describe("Challenger 1: Adversarial Stress Test Suite for Like/Clap Counter", ()
+-      vi.mocked(db.post.update).mockImplementation(async (args: any) => {
++      (vi.mocked(db.post.update) as any).mockImplementation(async (args: any) => {
+         capturedIncrements.push(args.data.likes.increment);

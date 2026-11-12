@@ -1,0 +1,17 @@
+--- a/src/lib/validations.ts
++++ b/src/lib/validations.ts
+@@ -85,12 +85,8 @@ export type AdminReplyInput = z.infer<typeof AdminReplySchema>;
+ 
+ export const SubscriberSchema = z.object({
+   email: z
+-    .string({
+-      required_error: "Alamat email wajib diisi",
+-      invalid_type_error: "Alamat email harus berupa teks",
+-    })
++    .string()
+     .trim()
+     .min(1, "Alamat email wajib diisi")
+     .email("Format alamat email tidak valid")
+     .max(100, "Alamat email terlalu panjang, maksimal 100 karakter")
+     .transform((val) => val.toLowerCase()),
+ });
