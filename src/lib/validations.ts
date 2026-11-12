@@ -33,7 +33,15 @@ export const PostCreateSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Slug hanya boleh berisi huruf kecil, angka, dan strip"),
   excerpt: z.string().trim().min(10).max(300),
   content: z.string().trim().min(50, "Konten artikel minimal 50 karakter"),
-  coverImage: z.string().url().optional().nullable(),
+  coverImage: z
+    .string()
+    .trim()
+    .refine(
+      (val) => !val || val.startsWith("/uploads/") || /^https?:\/\//i.test(val),
+      { message: "URL gambar tidak valid" }
+    )
+    .optional()
+    .nullable(),
   tags: z.array(z.string()).default([]),
 });
 
@@ -53,7 +61,10 @@ export const PostAdminSchema = z.object({
   coverImage: z
     .string()
     .trim()
-    .url("URL gambar tidak valid")
+    .refine(
+      (val) => !val || val.startsWith("/uploads/") || /^https?:\/\//i.test(val),
+      { message: "URL gambar tidak valid" }
+    )
     .optional()
     .nullable()
     .or(z.literal("")),

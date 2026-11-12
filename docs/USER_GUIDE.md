@@ -20,6 +20,7 @@ Selamat datang di **Panduan Pengguna Antigravity Multi-Agent Blog**. Dokumen ini
    - [Moderasi Komentar (Comment Moderation)](#moderasi-komentar-comment-moderation)
    - [Membalas Komentar sebagai Author](#membalas-komentar-sebagai-author)
    - [Manajemen Pelanggan Newsletter (Subscriber Management)](#manajemen-pelanggan-newsletter-subscriber-management)
+   - [Manajemen Pustaka Media (Media Library CMS)](#manajemen-pustaka-media-media-library-cms)
    - [Keluar dari Sesi Admin (Logout)](#keluar-dari-sesi-admin-logout)
 4. [Panduan Agen Operasional Mandiri (Autonomous Agents)](#4-panduan-agen-operasional-mandiri-autonomous-agents)
    - [Content Creator Agent (Posting Harian)](#content-creator-agent-posting-harian)
@@ -203,6 +204,41 @@ Pilih tab **"Pelanggan Newsletter"** di Dashboard Admin:
 2. **Pencarian & Filter**: Cari pelanggan berdasarkan alamat email atau filter berdasarkan status (`Semua`, `Aktif`, `Nonaktif`).
 3. **Toggle Status Langganan**: Klik tombol toggle untuk menonaktifkan atau mengaktifkan kembali langganan suatu email tanpa menghapus rekam jejaknya.
 4. **Hapus Pelanggan**: Klik tombol hapus untuk membersihkan data email jika diminta oleh pengguna (*right-to-be-forgotten*).
+
+---
+
+### Manajemen Pustaka Media (Media Library CMS)
+
+Pilih tab **"Pustaka Media"** di Dashboard Admin (`/admin`):
+
+#### A. Mengunggah & Mengelola Berkas Gambar
+1. **Unggah Berkas Baru**:
+   - Klik tombol **"Unggah Berkas"** di pojok kanan atas galeri media.
+   - Pilih berkas gambar dari perangkat Anda.
+   - Sistem memvalidasi tipe berkas (mendukung **PNG, JPEG, WebP, GIF, SVG**) dan batas ukuran maksimal **5 MB**.
+   - Berkas secara otomatis diberi nama unik kriptografis berbasis waktu dan hash aman (`{timestamp}-{hash}-{nama}.{ext}`) serta disimpan di folder `public/uploads/`.
+2. **Melihat & Mencari Berkas**:
+   - Galeri menampilkan grid thumbnail gambar, nama berkas, ukuran, dan tanggal unggah.
+   - Gunakan kotak **"Cari media..."** untuk memfilter berkas berdasarkan nama.
+3. **Salin URL & Format Markdown**:
+   - Klik tombol **"Salin URL"** untuk mendapatkan tautan langsung ke berkas (`/uploads/...`).
+   - Klik tombol **"Salin Markdown"** untuk menyalin sintaks gambar siap tempel (`![nama-file](/uploads/...)`).
+4. **Menghapus Berkas Media**:
+   - Klik tombol ikon tempat sampah pada kartu berkas.
+   - Konfirmasikan pada dialog **"Hapus Berkas Media"**. Berkas fisik di disk akan dihapus secara permanen.
+
+#### B. Integrasi Gambar Langsung pada Editor Artikel (PostEditor)
+Saat menulis atau mengedit artikel di tab **"Manajemen Artikel"**:
+1. **Tombol "Unggah Gambar"**:
+   - Klik tombol **"Unggah Gambar"** di atas toolbar textarea editor untuk memilih gambar dari perangkat Anda.
+   - Gambar langsung diunggah ke server dan sintaks markdown `![nama](/uploads/...)` otomatis disisipkan tepat pada posisi kursor.
+2. **Tombol "Pustaka Media"**:
+   - Klik tombol **"Pustaka Media"** untuk membuka modal pemilih galeri.
+   - Pilih gambar yang sudah pernah diunggah sebelumnya untuk disisipkan ke dalam draf.
+3. **Drag-and-Drop Gambar**:
+   - Anda dapat menarik (*drag*) berkas gambar langsung dari komputer dan melepaskannya (*drop*) di atas textarea editor. Berkas akan terunggah otomatis dan disisipkan.
+4. **Pengaturan Gambar Sampul (Cover Image)**:
+   - Pada kolom **"Gambar Sampul (Cover Image)"**, Anda dapat memasukkan URL gambar, mengunggah cover baru langsung, atau memilih dari pustaka media yang ada. Pratinjau thumbnail cover akan tampil seketika.
 
 ---
 

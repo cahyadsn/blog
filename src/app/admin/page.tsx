@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { PostList } from "@/components/admin/PostList";
 import { CommentList, CommentCounts } from "@/components/admin/CommentList";
 import { SubscriberList } from "@/components/admin/SubscriberList";
+import { MediaLibrary } from "@/components/admin/MediaLibrary";
 import {
   FileText,
   EyeOff,
@@ -16,6 +17,7 @@ import {
   RefreshCw,
   Layers,
   Users,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface AdminMetrics {
@@ -28,11 +30,12 @@ interface AdminMetrics {
   spamComments: number;
   totalSubscribers: number;
   activeSubscribers: number;
+  totalMedia: number;
 }
 
 export default function AdminDashboardPage() {
-  // Active Tab: "posts" | "comments" | "subscribers"
-  const [activeTab, setActiveTab] = useState<"posts" | "comments" | "subscribers">("posts");
+  // Active Tab: "posts" | "comments" | "subscribers" | "media"
+  const [activeTab, setActiveTab] = useState<"posts" | "comments" | "subscribers" | "media">("posts");
 
   // Metrics State
   const [metrics, setMetrics] = useState<AdminMetrics>({
@@ -45,24 +48,27 @@ export default function AdminDashboardPage() {
     spamComments: 0,
     totalSubscribers: 0,
     activeSubscribers: 0,
+    totalMedia: 0,
   });
 
   const [isLoadingMetrics, setIsLoadingMetrics] = useState<boolean>(true);
 
-  // Fetch summary metrics from posts, comments, and subscribers APIs
+  // Fetch summary metrics from posts, comments, subscribers, and media APIs
   const fetchMetrics = useCallback(async () => {
     setIsLoadingMetrics(true);
     try {
-      const [postsRes, commentsRes, subscribersRes] = await Promise.all([
+      const [postsRes, commentsRes, subscribersRes, mediaRes] = await Promise.all([
         fetch("/api/admin/posts?status=all"),
         fetch("/api/admin/comments?status=ALL"),
         fetch("/api/admin/subscribers"),
+        fetch("/api/admin/media"),
       ]);
 
-      const [postsData, commentsData, subscribersData] = await Promise.all([
+      const [postsData, commentsData, subscribersData, mediaData] = await Promise.all([
         postsRes.json(),
         commentsRes.json(),
         subscribersRes.json(),
+        mediaRes.ok ? mediaRes.json().catch(() => ({ success: false, media: [] })) : { success: false, media: [] },
       ]);
 
       const postsList = postsData.success && Array.isArray(postsData.posts) ? postsData.posts : [];
@@ -100,6 +106,11 @@ export default function AdminDashboardPage() {
           ? subscribersData.subscribers.filter((s: { active: boolean }) => s.active).length
           : 0;
 
+      const totalMedia =
+        mediaData.success && Array.isArray(mediaData.media)
+          ? mediaData.media.length
+          : 0;
+
       setMetrics({
         totalPosts,
         publishedPosts,
@@ -110,6 +121,7 @@ export default function AdminDashboardPage() {
         spamComments,
         totalSubscribers,
         activeSubscribers,
+        totalMedia,
       });
     } catch {
       // ignore metrics fetch error, keep default values
@@ -142,6 +154,14 @@ export default function AdminDashboardPage() {
     }));
   };
 
+  // Callback to sync media count updates from MediaLibrary
+  const handleMediaCountsUpdate = (count: number) => {
+    setMetrics((prev) => ({
+      ...prev,
+      totalMedia: count,
+    }));
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Metrics Summary Section */}
@@ -167,7 +187,7 @@ export default function AdminDashboardPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {/* Card 1: Total Artikel */}
           <Card className="hover:border-indigo-300 dark:hover:border-indigo-800 transition-all">
             <CardContent className="p-5 flex items-center justify-between">
@@ -273,6 +293,26 @@ export default function AdminDashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Card 6: Pustaka Media */}
+          <Card className="hover:border-violet-300 dark:hover:border-violet-800 transition-all">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Pustaka Media
+                </p>
+                <div className="text-2xl font-black text-violet-600 dark:text-violet-400 mt-1">
+                  {isLoadingMetrics ? "..." : metrics.totalMedia}
+                </div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                  Berkas gambar aktif
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center shadow-sm">
+                <ImageIcon className="w-6 h-6" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -332,6 +372,22 @@ export default function AdminDashboardPage() {
               {metrics.totalSubscribers}
             </Badge>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("media")}
+            className={`flex items-center gap-2.5 pb-3 px-2 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+              activeTab === "media"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>Pustaka Media</span>
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-1">
+              {metrics.totalMedia}
+            </Badge>
+          </button>
         </div>
 
         {/* Tab Content Display */}
@@ -342,6 +398,9 @@ export default function AdminDashboardPage() {
           )}
           {activeTab === "subscribers" && (
             <SubscriberList onCountsUpdate={handleSubscriberCountsUpdate} />
+          )}
+          {activeTab === "media" && (
+            <MediaLibrary onMediaCountChange={handleMediaCountsUpdate} />
           )}
         </div>
       </section>

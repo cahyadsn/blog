@@ -2,7 +2,7 @@
 
 A modern, production-grade, full-stack blog application engineered and maintained by an **autonomous Multi-Agent System** using **Google Antigravity**, **Next.js 15 (App Router)**, **React 19**, **Tailwind CSS**, and **Prisma ORM**.
 
-Now featuring **Interactive Like/Clap Counter**, **Newsletter Subscription Suite**, **SEO & RSS Syndication**, **Full-Text Article Search**, **Interactive Dark/Light Mode**, and **Protected Admin Authentication**, alongside the complete **Admin CMS Dashboard** and autonomous operations.
+Now featuring **Media Library CMS & Image Upload**, **Interactive Like/Clap Counter**, **Newsletter Subscription Suite**, **SEO & RSS Syndication**, **Full-Text Article Search**, **Interactive Dark/Light Mode**, and **Protected Admin Authentication**, alongside the complete **Admin CMS Dashboard** and autonomous operations.
 
 ---
 
@@ -61,7 +61,7 @@ flowchart TD
 | **Database Agent** | Relational schema modeling & migrations | On-demand | `prisma/schema.prisma`, `prisma/seed.ts`, `src/lib/db.ts` |
 | **Backend API Agent** | Auth logic, Admin API, Zod validation | On-demand | `src/app/api/*`, `src/app/api/admin/*`, `src/lib/auth.ts`, `src/middleware.ts` |
 | **Frontend UI/UX Agent** | Public blog, SearchBar, Admin CMS, Live Preview | On-demand | `src/app/page.tsx`, `SearchBar.tsx`, `src/app/admin/*`, `src/components/admin/*` |
-| **Unit Testing Agent** | Vitest test suites & lifecycle verification | CI / Pre-commit | `tests/*` (**236/236 tests passing 100%**) |
+| **Unit Testing Agent** | Vitest test suites & lifecycle verification | CI / Pre-commit | `tests/*` (**313/313 tests passing 100% across 17 test suites**) |
 | **Technical Writer Agent** | User guides, API specifications & repository docs | On-demand / Release | `docs/USER_GUIDE.md`, `docs/REPOSITORY_DOCUMENTATION.md` |
 | **DevOps Agent** | Git version control & GitHub Actions CI/CD | Push / Pull Request | `.github/workflows/ci.yml` |
 | **Content Creator Agent** | Generates in-depth tech articles from backlog | Scheduled (`0 8 * * *`) | `scripts/daily-content.ts`, `content/backlog.json` |
@@ -100,6 +100,28 @@ flowchart TD
   - Filter by status: `PENDING`, `APPROVED`, `SPAM`.
   - Quick action buttons: **Approve**, **Mark as Spam**, **Delete**.
   - **Direct Author Reply**: Respond directly to readers with the `isAuthorReply: true` badge.
+- **Pustaka Media & Unggah Gambar (Media Library CMS)**:
+  - **Penyimpanan Lokal Andal**: Gambar disimpan secara lokal pada direktori `public/uploads/` dengan penamaan teracak deterministik berbasis timestamp dan hash kriptografis (`{timestamp}-{randomHex}-{sanitizedName}.{ext}`) guna mencegah tabrakan nama berkas dan race condition di disk.
+  - **Validasi Multi-Layer & Keamanan Ketat**:
+    - **Whitelist Ekstensi & MIME**: Mendukung PNG, JPEG, WebP, GIF, dan SVG (`ALLOWED_MIME_TYPES`).
+    - **Inspeksi Biner Magic Bytes**: Verifikasi keaslian berkas dengan membaca signature biner pada byte awal (PNG `89 50 4E 47...`, JPEG `FF D8 FF`, GIF `GIF8`, WebP `RIFF....WEBP`) untuk menangkal MIME-spoofing dan upload executable terlarang.
+    - **Sanitasi Vektor SVG Anti-XSS**: Pemindaian mendalam XML SVG terhadap injeksi `<script>`, URI `javascript:`, serta atribut event listener seperti `onload=` dan `onerror=`.
+    - **Batasan Ukuran Berkas**: Pembatasan ukuran maksimum berkas sebesar 5MB (`MAX_FILE_SIZE = 5,242,880 bytes`).
+    - **Proteksi Direktori & Traversal**: Mencegah serangan path traversal (`..`, null bytes) dan melindungi berkas sistem (`.gitkeep`) dari penghapusan tidak sengaja.
+  - **Admin Media Library Gallery Tab**:
+    - Tab khusus **"Pustaka Media"** pada dashboard admin (`/admin`) dengan grid galeri visual responsif.
+    - Pratinjau modal beresolusi penuh, pencarian instan nama berkas, salin URL publik satu-klik (`/uploads/...`), dan salin format Markdown `![alt](/uploads/...)`.
+    - Modal konfirmasi penghapusan aman untuk mencegah penghapusan file media yang tidak disengaja.
+  - **Integrasi Penuh PostEditor**:
+    - Tombol toolbar khusus **"Unggah Gambar"** (pemilihan berkas langsung dari perangkat) dan **"Pustaka Media"** (pemilihan dari galeri terunggah).
+    - **Penyisipan Cerdas Berbasis Kursor (*Cursor-Aware Insertion*)**: Menyisipkan sintaks Markdown `![nama-file](/uploads/...)` tepat pada posisi kursor pengguna saat mengetik artikel.
+    - **Dukungan Drag-and-Drop**: Pengguna dapat langsung menarik dan melepaskan berkas gambar ke area editor teks.
+    - **Pemilih Gambar Sampul (*Cover Image Picker*)**: Antarmuka visual untuk mengatur sampul postingan, thumbnail preview, memilih dari galeri pustaka media, atau menghapus cover image.
+  - **Admin REST API Endpoints**:
+    - `POST /api/admin/media/upload`: Mengunggah berkas multipart/form-data dengan validasi penuh dan sanitasi nama berkas.
+    - `GET /api/admin/media`: Mengambil daftar berkas media terurut kronologis terbaru, mendukung filter query `?search=...`.
+    - `GET /api/admin/media/[id]`: Mengambil metadata spesifik satu berkas media.
+    - `DELETE /api/admin/media/[id]` & `DELETE /api/admin/media?filename=...`: Menghapus berkas media fisik dari disk secara aman.
 
 ### 3. Autonomous AI Agents
 - **Daily Content Creator**: Autonomous script creating structured technical articles from backlog.
@@ -118,7 +140,7 @@ flowchart TD
 - **Data Validation & Sanitization**: [Zod](https://zod.dev/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Markdown Parser**: [Marked](https://marked.js.org/)
-- **Testing**: [Vitest](https://vitest.dev/) (236 automated test cases)
+- **Testing**: [Vitest](https://vitest.dev/) (313 automated test cases across 17 test suites)
 - **CI/CD**: GitHub Actions
 
 ---
@@ -140,6 +162,8 @@ d:/c/blog/
 ├── prisma/
 │   ├── schema.prisma                  # Database schema (Post, Tag, PostTag, Comment)
 │   └── seed.ts                        # Initial demo articles and comments
+├── public/
+│   └── uploads/                       # Local media uploads storage (.gitkeep protected)
 ├── scripts/
 │   ├── daily-content.ts               # Content Creator & Editor Agent runner
 │   └── reply-comments.ts              # Comment Responder & Moderator Agent runner
@@ -161,12 +185,20 @@ d:/c/blog/
 │   │   │   │   │   │   ├── reply/route.ts # Direct author reply endpoint
 │   │   │   │   │   │   └── route.ts       # Approve, spam flag, delete comment
 │   │   │   │   │   └── route.ts           # Admin list comments with status filters
-│   │   │   │   └── posts/
-│   │   │   │       ├── [id]/
-│   │   │   │       │   ├── publish/route.ts # Toggle publish/draft status
-│   │   │   │       │   └── route.ts        # Update & delete post
-│   │   │   │       └── route.ts            # Admin list & create post
+│   │   │   │   ├── media/
+│   │   │   │   │   ├── [id]/route.ts  # Media metadata & delete by id route
+│   │   │   │   │   ├── upload/route.ts# Multipart image upload & validation endpoint
+│   │   │   │   │   └── route.ts       # List media gallery & delete by query route
+│   │   │   │   ├── posts/
+│   │   │   │   │   ├── [id]/
+│   │   │   │   │   │   ├── publish/route.ts # Toggle publish/draft status
+│   │   │   │   │   │   └── route.ts        # Update & delete post
+│   │   │   │   │   └── route.ts            # Admin list & create post
+│   │   │   │   └── subscribers/       # Admin subscriber management endpoints
+│   │   │   │       ├── [id]/route.ts  # Toggle active status & delete subscriber
+│   │   │   │       └── route.ts       # List subscribers with status & search filters
 │   │   │   ├── comments/route.ts      # Public comment submission endpoint
+│   │   │   ├── newsletter/route.ts    # Public newsletter subscription endpoint
 │   │   │   └── posts/route.ts         # Public post listing endpoint
 │   │   ├── globals.css                # Tailwind & Dark/Light mode tokens
 │   │   ├── layout.tsx                 # Public layout with Navbar, Theme script & Footer
@@ -178,12 +210,18 @@ d:/c/blog/
 │   │   │   ├── CommentList.tsx        # Comment moderation list & quick actions
 │   │   │   ├── CommentReplyModal.tsx  # Direct author reply modal
 │   │   │   ├── LogoutButton.tsx       # Session termination button
-│   │   │   ├── PostEditor.tsx         # Markdown editor with live preview
-│   │   │   └── PostList.tsx           # Post management table & publish toggle
+│   │   │   ├── MediaDeleteModal.tsx   # Confirmation modal for media file deletion
+│   │   │   ├── MediaLibrary.tsx       # Visual gallery grid, filter, copy link & upload zone
+│   │   │   ├── MediaSelectModal.tsx   # Reusable image picker for PostEditor & Cover Image
+│   │   │   ├── PostEditor.tsx         # Markdown editor with live preview & media insert
+│   │   │   ├── PostList.tsx           # Post management table & publish toggle
+│   │   │   └── SubscriberList.tsx     # Subscriber management table & actions
 │   │   ├── blog/                      # Public Blog Components
 │   │   │   ├── CommentSection.tsx     # Interactive reader discussion
 │   │   │   ├── Footer.tsx             # Site footer
+│   │   │   ├── LikeButton.tsx         # Interactive like counter with debounce
 │   │   │   ├── Navbar.tsx             # Sticky navigation with ThemeToggle & Admin link
+│   │   │   ├── NewsletterForm.tsx     # Newsletter subscription component
 │   │   │   ├── PostCard.tsx           # Post summary card
 │   │   │   └── SearchBar.tsx          # Full-text search input with tag filters
 │   │   └── ui/                        # Reusable atomic UI elements
@@ -197,14 +235,25 @@ d:/c/blog/
 │       ├── auth.ts                    # Web Crypto HMAC session token generator & verifier
 │       ├── db.ts                      # Prisma Client singleton
 │       ├── markdown.ts                # Markdown parsing & reading time estimation
+│       ├── media.ts                   # Media validation, magic bytes, SVG sanitization, path safety
 │       └── validations.ts             # Zod schemas (Post, Comment, Admin Actions)
 ├── tests/
 │   ├── admin-comments-api.test.ts     # Admin comment moderation API tests (21 tests)
 │   ├── admin-integration.test.ts      # Real SQLite DB lifecycle & scenario tests (15 tests)
-│   ├── admin-posts-api.test.ts         # Admin post management API tests (26 tests)
+│   ├── admin-media-api.test.ts        # Comprehensive Media API test suite (26 tests)
+│   ├── admin-posts-api.test.ts        # Admin post management API tests (26 tests)
+│   ├── admin-subscribers.test.ts      # Admin subscriber management tests (12 tests)
 │   ├── admin-validations.test.ts      # Admin Zod validation schemas (33 tests)
 │   ├── auth.test.ts                   # Admin session & token verification tests (4 tests)
+│   ├── challenger-2-verification.test.ts # Challenger verification tests (17 tests)
+│   ├── challenger-likes-stress.test.ts   # Concurrency & rate-limiting tests (13 tests)
+│   ├── challenger-media-security.test.ts # Security, SVG XSS & MIME spoofing tests (15 tests)
+│   ├── challenger-media-storage.test.ts  # Storage boundaries & collision tests (36 tests)
+│   ├── challenger-newsletter-stress.test.ts # Newsletter stress tests (22 tests)
+│   ├── likes-api.test.ts              # Like counter API tests (16 tests)
 │   ├── markdown.test.ts               # Slug & markdown parser tests (3 tests)
+│   ├── newsletter.test.ts             # Newsletter subscription tests (13 tests)
+│   ├── seo.test.ts                    # SEO, RSS, Sitemap & OpenGraph tests (35 tests)
 │   └── validations.test.ts            # Public validation tests (6 tests)
 ├── AGENTS.md                          # Multi-agent system prompts & cron schedules
 ├── package.json
@@ -249,20 +298,42 @@ npm.cmd run dev
 
 ## 🧪 Automated Testing & Quality Assurance
 
-The application features **108 automated tests** across 7 test suites verifying input validation, route security, and real SQLite database lifecycles:
+The application features **313 automated tests** across 17 test suites verifying input validation, route security, media upload and storage integrity, and real SQLite database lifecycles:
 
 ```powershell
 npm.cmd run test
 ```
 
+Or execute individual test suites:
+```powershell
+# Jalankan test suite Media Library & Image Upload:
+npx.cmd vitest run tests/admin-media-api.test.ts
+
+# Jalankan test suite keamanan berkas & SVG XSS:
+npx.cmd vitest run tests/challenger-media-security.test.ts
+
+# Jalankan test suite batas penyimpanan disk & collision:
+npx.cmd vitest run tests/challenger-media-storage.test.ts
+```
+
 Test coverage includes:
-- **`tests/auth.test.ts` (4 tests)**: Admin session token generation, HMAC verification, expiration, and tampering detection.
-- **`tests/admin-validations.test.ts` (33 tests)**: Post creation, slug formatting, update payloads, comment status changes, and author replies.
-- **`tests/admin-posts-api.test.ts` (26 tests)**: Admin post CRUD, duplicate slug rejection, tag synchronization, and publish toggling.
-- **`tests/admin-comments-api.test.ts` (21 tests)**: Comment status transitions, deletion, and threaded author replies.
-- **`tests/admin-integration.test.ts` (15 tests)**: Real SQLite DB constraints, cascade deletions, and end-to-end user workflows.
-- **`tests/validations.test.ts` (6 tests)**: Public input sanitization and anti-XSS injection protection.
-- **`tests/markdown.test.ts` (3 tests)**: Reading time calculation and markdown-to-HTML rendering.
+- **`tests/admin-media-api.test.ts` (26 tests)**: Upload berkas multipart, validasi MIME/Magic Bytes, listing media dengan sorting, pengambilan metadata ID, dan penghapusan berkas fisik.
+- **`tests/challenger-media-security.test.ts` (15 tests)**: Proteksi directory traversal (`..`), SVG malicious `<script>` & `onload=` XSS defense, MIME spoofing binary executable, dan penolakan payload tanpa otentikasi admin.
+- **`tests/challenger-media-storage.test.ts` (36 tests)**: Batas eksak 5MB (5,242,880 bytes), deteksi berkas 0-byte, resolusi nama unik acak, proteksi berkas sistem `.gitkeep`, dan integritas disk I/O.
+- **`tests/seo.test.ts` (35 tests)**: Dynamic sitemap XML, robots.txt, dynamic RSS 2.0 feed, dan Satori Open Graph preview images.
+- **`tests/admin-validations.test.ts` (33 tests)**: Post creation, slug formatting, update payloads, comment status changes, dan author replies.
+- **`tests/admin-posts-api.test.ts` (26 tests)**: Admin post CRUD, duplicate slug rejection, tag synchronization, dan publish toggling.
+- **`tests/challenger-newsletter-stress.test.ts` (22 tests)**: Concurrent subscriber stress testing, idempotent resubscription, dan email injection defense.
+- **`tests/admin-comments-api.test.ts` (21 tests)**: Comment status transitions, deletion, dan threaded author replies.
+- **`tests/challenger-2-verification.test.ts` (17 tests)**: Verifikasi integrasi OpenGraph dynamic images, feed dates, dan RSS XML structure.
+- **`tests/likes-api.test.ts` (16 tests)**: Dynamic like/clap counter, atomic increments, dan sliding-window rate limiting.
+- **`tests/admin-integration.test.ts` (15 tests)**: Real SQLite DB constraints, cascade deletions, dan end-to-end user workflows.
+- **`tests/newsletter.test.ts` (13 tests)**: Public newsletter subscription route and Zod email validation.
+- **`tests/challenger-likes-stress.test.ts` (13 tests)**: Concurrency race condition prevention and rate limiting stress.
+- **`tests/admin-subscribers.test.ts` (12 tests)**: Admin subscriber listing, active toggling, search, dan deletion.
+- **`tests/validations.test.ts` (6 tests)**: Public input sanitization dan anti-XSS injection protection.
+- **`tests/auth.test.ts` (4 tests)**: Admin session token generation, HMAC verification, expiration, dan tampering detection.
+- **`tests/markdown.test.ts` (3 tests)**: Reading time calculation dan markdown-to-HTML rendering.
 
 To verify the production build:
 ```powershell
@@ -310,7 +381,7 @@ git push -u origin main
 ```
 
 ### 2. CI/CD Pipeline
-Every push and pull request to `main` automatically triggers [`.github/workflows/ci.yml`](.github/workflows/ci.yml) to run dependency auditing, Prisma generation, Vitest test suites (108 tests), and Next.js production builds.
+Every push and pull request to `main` automatically triggers [`.github/workflows/ci.yml`](.github/workflows/ci.yml) to run dependency auditing, Prisma generation, Vitest test suites (313 tests), and Next.js production builds.
 
 ### 3. Deploying to Vercel / Railway
 1. Connect your repository to [Vercel](https://vercel.com) or [Railway](https://railway.app).

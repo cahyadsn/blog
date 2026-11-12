@@ -1,71 +1,48 @@
-# Sentinel Handoff Report: Blog Community & Interaction Features
+# Handoff Report — Project Sentinel
 
-**Sentinel Agent**: Project Sentinel (`teamwork_sentinel`)  
-**Parent Agent**: `54ffac99-5f7e-444b-9f55-c0cf942ab34f`  
-**Working Directory**: `d:\c\blog`  
-**State Folder**: `d:\c\blog\.agents\teamwork\sentinel\`  
-**Date**: 2026-11-12T03:43:30Z  
-**Verdict**: **VICTORY CONFIRMED**  
+**Date**: 2026-11-12T18:02:40Z  
+**Feature**: Media Library & Image Upload (Pustaka Media & Unggah Gambar)  
+**Status**: COMPLETED  
+**Victory Audit Verdict**: **VICTORY CONFIRMED**
 
 ---
 
 ## 1. Observation
-
-All requirements from `ORIGINAL_REQUEST.md` have been fully delivered, rigorously tested, reviewed, empirically stress-tested, and independently verified by the independent Victory Auditor (`teamwork_victory_auditor`):
-
-1. **R1. Interactive Like / Clap Counter**:
-   - `prisma/schema.prisma`: Added `likes Int @default(0)` to the `Post` model, synchronized with `prisma/dev.db` via `prisma db push`.
-   - `src/lib/rate-limit.ts`: Sliding-window in-memory IP rate limiter returning HTTP 429 and `Retry-After: 10` upon >10 requests within a 10s window.
-   - `src/app/api/posts/[id]/like/route.ts`: API endpoint supporting `GET` (fetch likes) and `POST` (increment likes with atomic database update `likes: { increment: amount }`), dual identifier lookup (CUID or slug), and rate-limit rejection.
-   - UI: `LikeButton.tsx` client component on `/posts/[slug]` with optimistic UI increments, heartbeat scale pulse animation (`animate-heart-pulse`), floating `+1` indicator (`animate-float-up`), and 500ms debounce accumulating clicks before issuing a network request. Total like counts also displayed on post cards on `/`.
-
-2. **R2. Newsletter Subscription System & Admin Dashboard**:
-   - `prisma/schema.prisma`: Added `Subscriber` model (`id`, unique `email`, `active`, `createdAt`), synchronized with SQLite database.
-   - `src/lib/validations.ts`: Zod 4 `SubscriberSchema` validating and normalizing email addresses.
-   - `src/app/api/newsletter/subscribe/route.ts`: Idempotent duplicate handling (returns HTTP 200 with `alreadySubscribed: true` without errors or duplicate rows), inactive subscriber reactivation, and `P2002` race condition defense.
-   - UI: `NewsletterForm.tsx` component in article footer with responsive layout and feedback alerts; Admin Dashboard (`/admin`) summary metric card and "Pelanggan Newsletter" management tab with `<SubscriberList />`.
-
-3. **R3. Automated Testing & Production Build**:
-   - 41 automated unit/route tests across `tests/likes-api.test.ts`, `tests/newsletter.test.ts`, and `tests/admin-subscribers.test.ts`.
-   - 31 adversarial stress tests across `tests/challenger-likes-stress.test.ts` and `tests/challenger-newsletter-stress.test.ts`.
-   - All 201 Vitest tests pass with 0 failures (`npx.cmd vitest run`).
-   - Next.js production build (`npm.cmd run build`) compiles cleanly with exit code 0 across all 28 static and dynamic routes.
-
----
+- The user task interview was completed, yielding the approved task prompt for the Media Library CMS feature.
+- Execution was routed to General (`teamwork_orchestrator`) per the Task Routing Decision Table.
+- The Project Orchestrator structured the work into Phase 0 (Codebase Survey) and Milestone 1 (Implementation & Verification) across 16 formal requirements mapped in `PROJECT.md`.
+- Implementation was completed by Worker agent (`teamwork_worker_m1`), delivering:
+  1. `src/lib/media.ts`: Secure local storage in `public/uploads/`, strict MIME validation (PNG, JPEG, WebP, GIF, SVG), magic byte verification, SVG anti-XSS XML sanitization, 5MB file size limit, UUID/timestamp naming, and multi-step path traversal protection.
+  2. `src/app/api/admin/media/upload/route.ts`, `src/app/api/admin/media/route.ts`, `src/app/api/admin/media/[id]/route.ts`: Protected REST API routes for uploading, listing, and deleting media files, secured with admin session authentication.
+  3. `src/components/admin/MediaLibrary.tsx`, `MediaDeleteModal.tsx`, `MediaSelectModal.tsx`: Admin CMS "Pustaka Media" tab with responsive grid preview, URL and Markdown snippet copy tools, and deletion dialogs.
+  4. `src/components/admin/PostEditor.tsx`: Seamless editor integration with direct image upload button, drag-and-drop onto the markdown textarea, cursor position insertion (`![alt](/uploads/...)`), and cover image selection.
+- Verification was conducted by a 5-subagent cluster:
+  - Reviewer 1 (Backend & Security): APPROVE
+  - Reviewer 2 (UI & Build): APPROVE
+  - Challenger 1 (Storage & Boundary stress testing): APPROVE (36/36 tests passed)
+  - Challenger 2 (SVG XSS & Schema stress testing): APPROVE (15/15 tests passed)
+  - Forensic Auditor (Anti-cheat & Code Authenticity): CLEAN
+- An independent post-victory audit was conducted by `teamwork_victory_auditor_1`, confirming Timeline provenance (Phase A: PASS), Integrity & Code Authenticity (Phase B: PASS), and Test & Build Verification (Phase C: PASS) with verdict **VICTORY CONFIRMED**.
 
 ## 2. Logic Chain
-
-1. **Routing & Dispatch**: The task was identified as General SWE work and routed to `teamwork_orchestrator`.
-2. **Decomposition & Swarm Execution**: The orchestrator surveyed the codebase, defined 15 feature items in `PROJECT.md`, formulated blueprints, and executed implementation via a dedicated full-stack worker.
-3. **Adversarial Gate & Remediation**: During Iteration 1, reviewers and the forensic auditor caught a TypeScript compilation error (`TS2769` under Zod 4) that prevented production builds. Gate 1 rejected the iteration. The team immediately entered Iteration 2 (Remediation), repaired the Zod 4 syntax and test mock typing, achieved zero errors in `tsc --noEmit` and `npm.cmd run build`, and executed clean succession to Gen 1.
-4. **Post-Remediation Verification Gate**: Gen 1 deployed 2 peer reviewers, 2 stress challengers, and 1 forensic auditor. All agents unanimously approved the implementation with clean verdicts.
-5. **Independent Victory Audit**: Project Sentinel dispatched `teamwork_victory_auditor` with zero shared context from the implementation swarm. The auditor conducted a 3-phase audit (timeline reconstruction, static & dynamic anti-cheating inspection, and build/test artifact verification) and delivered a structured verdict of **VICTORY CONFIRMED**.
-
----
+1. **Interview & Scope Locking**: Interview finalized acceptance criteria across 4 dimensions: storage security, admin endpoints, CMS/editor integration, and comprehensive testing.
+2. **Architecture & Decomposition**: Decomposed into survey, blueprinting, implementation, and multi-angle adversarial verification to prevent regressions and security vulnerabilities (e.g. path traversal, arbitrary file upload, SVG script injection).
+3. **Defense-in-Depth**:
+   - Magic byte inspection prevents file extension spoofing.
+   - SVG parsing scrubs `<script>`, `onload`, `onerror`, and `javascript:` URIs.
+   - Filenames are sanitized and prepended with timestamp/random tokens; path resolution checks boundaries against `UPLOAD_DIR`.
+4. **Verification & Audit**: Independent Victory Auditor verified all 313 Vitest tests (26 media tests + 51 stress tests + 236 pre-existing baseline tests) passing with 0 regressions, clean TypeScript compilation, and 100% Next.js build success.
 
 ## 3. Caveats
-
-- **Rate Limiting Storage**: The sliding-window rate limiter runs in-memory (`src/lib/rate-limit.ts`). In multi-instance serverless deployments across different edge regions, rate limits are enforced per-instance unless backed by an external distributed store like Redis/KV.
-- **SQLite Concurrency**: In high-concurrency environments, SQLite (`prisma/dev.db`) operates with file-level locks; the atomic increment logic protects counter integrity, but production high-throughput deployments should consider PostgreSQL or MySQL.
-
----
+- Files uploaded locally to `public/uploads/` are served statically by Next.js. In ephemeral container environments (e.g., serverless Vercel deployments), persistent object storage (S3/GCS) would be needed, though local disk storage matches the project specification.
+- Uploaded media directory `.gitignore` ignores media files while keeping `public/uploads/.gitkeep` tracked.
 
 ## 4. Conclusion
-
-All acceptance criteria are satisfied with zero regressions and zero facades. The independent Victory Audit has formally returned **VICTORY CONFIRMED**.
-
----
+The Media Library & Image Upload CMS feature is 100% complete, fully tested, securely implemented, and independently audited.
 
 ## 5. Verification Method
-
-- **Vitest Automated Test Suite**:
-  ```powershell
-  npm.cmd test
-  ```
-  Expected: 201/201 tests passing across 12 test files.
-
-- **Next.js Production Build**:
-  ```powershell
-  npm.cmd run build
-  ```
-  Expected: Clean compilation with Exit Code 0 across all 28 routes.
+- Vitest media test suite: `npx.cmd vitest run tests/admin-media-api.test.ts` (26/26 passed)
+- Vitest adversarial stress test suites: `tests/challenger-media-storage.test.ts` & `tests/challenger-media-security.test.ts` (51/51 passed)
+- Full regression test suite: `npm.cmd test` (313/313 passed across 17 test suites)
+- TypeScript compiler verification: `npx.cmd tsc --noEmit` (0 errors)
+- Next.js production build: `npm.cmd run build` (Exit code 0, 17/17 routes generated cleanly)

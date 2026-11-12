@@ -33,3 +33,8 @@ next-env.d.ts
 # SQLite database
 /prisma/*.db
 /prisma/*.db-journal
+
+# uploaded media assets
+/public/uploads/*
+!/public/uploads/.gitkeep
+

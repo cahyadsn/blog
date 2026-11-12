@@ -150,12 +150,18 @@ Menyimpan data pelanggan buletin teknis (newsletter).
 | `GET` | `/api/admin/subscribers` | Mengambil daftar pelanggan newsletter dengan filter status dan pencarian | Admin |
 | `PATCH` | `/api/admin/subscribers/[id]` | Mengubah status aktif/nonaktif langganan | Admin |
 | `DELETE` | `/api/admin/subscribers/[id]` | Menghapus data pelanggan dari basis data | Admin |
+| `POST` | `/api/admin/media/upload` | Mengunggah gambar multipart/form-data dengan validasi MIME, magic bytes, & anti-XSS SVG | Admin |
+| `GET` | `/api/admin/media` | Mengambil seluruh berkas media lokal di `public/uploads` dengan filter `?search=...` | Admin |
+| `GET` | `/api/admin/media/[id]` | Mengambil metadata spesifik satu berkas media (nama, URL, ukuran, tanggal unggah) | Admin |
+| `DELETE` | `/api/admin/media/[id]` | Menghapus berkas media fisik dari disk secara aman (proteksi path traversal) | Admin |
 
 ---
 
 ## 4. Struktur Modul & Komponen Frontend
 
 ```text
+public/
+└── uploads/                       # Direktori penyimpanan lokal berkas media unggahan
 src/
 ├── app/
 │   ├── layout.tsx                 # Root HTML shell dengan Navbar dan Footer
@@ -165,14 +171,16 @@ src/
 │   │   └── [slug]/page.tsx        # Detail artikel dengan konversi Markdown & diskusi pembaca
 │   └── admin/
 │       ├── layout.tsx             # Shell antarmuka khusus admin
-│       └── page.tsx               # Client Component: State management untuk tab artikel & moderasi
+│       └── page.tsx               # Client Component: State management untuk tab artikel, moderasi, & media
 ├── components/
 │   ├── ui/                        # Komponen atomik: Button, Badge, Card, Input, Textarea
-│   ├── blog/                      # Komponen pembaca: PostCard, CommentSection, Navbar, Footer
-│   └── admin/                     # Komponen CMS: PostList, PostEditor (Live Preview), CommentList, CommentReplyModal
+│   ├── blog/                      # Komponen pembaca: PostCard, CommentSection, LikeButton, NewsletterForm
+│   └── admin/                     # Komponen CMS: PostList, PostEditor, CommentList, SubscriberList, MediaLibrary, MediaDeleteModal, MediaSelectModal
 └── lib/
     ├── db.ts                      # Singleton PrismaClient dengan isolasi hot-reload
     ├── markdown.ts                # Parser marked & fungsi penghitung waktu baca (WPM)
+    ├── media.ts                   # Engine utilitas media: MIME whitelist, magic bytes, sanitasi SVG, & penamaan berkas
+    ├── rate-limit.ts              # Sliding-window rate limiter in-memory
     └── validations.ts             # Schema validasi Zod untuk seluruh operasi data
 ```
 
@@ -180,7 +188,7 @@ src/
 
 ## 5. Infrastruktur Pengujian (Testing Infrastructure)
 
-Pengujian diotomatisasi menggunakan **Vitest** dan mencakup 14 berkas uji dengan total **236 test cases (100% lulus)**:
+Pengujian diotomatisasi menggunakan **Vitest** dan mencakup 17 berkas uji dengan total **313 test cases (100% lulus)**:
 
 ```powershell
 npx.cmd vitest run
@@ -233,6 +241,13 @@ npx.cmd vitest run
     - Pengujian adversarial penanganan masukan email newsletter (Unicode, domain unik, payload panjang).
 14. `tests/challenger-2-verification.test.ts` (17 tests):
     - Verifikasi empiris pembentukan kartu sosial pratinjau dinamis Satori OG Image.
+15. `tests/admin-media-api.test.ts` (26 tests):
+    - Pengujian endpoint upload berkas multipart, listing media dengan filter pencarian, dan penghapusan berkas fisik.
+    - Verifikasi proteksi session admin dan penanganan berkas yang tidak ditemukan.
+16. `tests/challenger-media-storage.test.ts` (36 tests):
+    - Pengujian batas ekstrem penyimpanan berkas: directory traversal (`../`), null-byte injection, double-extension spoofing, berkas 0-byte, dan penulisan bersamaan.
+17. `tests/challenger-media-security.test.ts` (15 tests):
+    - Pengujian keamanan payload: inspeksi biner magic bytes (menolak file PHP/EXE berkedok PNG/JPG) dan sanitasi mendalam vektor SVG anti-XSS (`<script>`, event handler inline).
 
 ---
 

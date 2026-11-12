@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { marked } from "marked";
 import { generateSlug } from "@/lib/markdown";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { MediaSelectModal } from "@/components/admin/MediaSelectModal";
+import { MediaItem } from "@/components/admin/MediaLibrary";
 import {
   Sparkles,
   ArrowLeft,
@@ -20,8 +22,10 @@ import {
   X,
   Plus,
   Loader2,
-  Image as ImageIcon,
   BookOpen,
+  Upload,
+  FolderOpen,
+  Trash2,
 } from "lucide-react";
 
 export interface PostTagItem {
@@ -93,6 +97,21 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Media upload & cursor refs
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorFileInputRef = useRef<HTMLInputElement>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+
+  // In-flight media upload states
+  const [isUploadingEditorImage, setIsUploadingEditorImage] = useState<boolean>(false);
+  const [isUploadingCoverImage, setIsUploadingCoverImage] = useState<boolean>(false);
+  const [isDragOverTextarea, setIsDragOverTextarea] = useState<boolean>(false);
+  const [coverImageLoadError, setCoverImageLoadError] = useState<boolean>(false);
+
+  // Modal selector state
+  const [isMediaSelectOpen, setIsMediaSelectOpen] = useState<boolean>(false);
+  const [mediaTarget, setMediaTarget] = useState<"content" | "cover">("content");
+
   // Configure marked once
   useEffect(() => {
     marked.setOptions({
@@ -124,6 +143,196 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
       isMounted = false;
     };
   }, [content]);
+
+  // Insert markdown snippet at current cursor position in textarea
+  const insertMarkdownAtCursor = (markdownSnippet: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setContent((prev) => (prev ? `${prev}\n\n${markdownSnippet}` : markdownSnippet));
+      return;
+    }
+
+    const startPos = textarea.selectionStart ?? textarea.value.length;
+    const endPos = textarea.selectionEnd ?? textarea.value.length;
+    const textBefore = textarea.value.substring(0, startPos);
+    const textAfter = textarea.value.substring(endPos);
+
+    const needsLeadingNewline = textBefore.length > 0 && !textBefore.endsWith("\n");
+    const needsTrailingNewline = textAfter.length > 0 && !textAfter.startsWith("\n");
+
+    const formattedSnippet =
+      (needsLeadingNewline ? "\n\n" : "") +
+      markdownSnippet +
+      (needsTrailingNewline ? "\n\n" : "");
+
+    const newContent = textBefore + formattedSnippet + textAfter;
+    setContent(newContent);
+
+    if (fieldErrors.content) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.content;
+        return next;
+      });
+    }
+
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = startPos + formattedSnippet.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  // Helper to upload an image file to /api/admin/media/upload
+  const uploadImageFile = async (file: File): Promise<MediaItem | null> => {
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"];
+    if (!allowed.includes(file.type)) {
+      setGeneralError(`Tipe berkas "${file.name}" tidak didukung. Harap unggah PNG, JPEG, WebP, GIF, atau SVG.`);
+      return null;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setGeneralError(`Ukuran berkas "${file.name}" melebihi batas maksimum 5MB.`);
+      return null;
+    }
+
+    if (file.size === 0) {
+      setGeneralError(`Berkas "${file.name}" kosong.`);
+      return null;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/admin/media/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Gagal mengunggah berkas");
+    }
+
+    return data.media;
+  };
+
+  // Editor toolbar: direct file upload
+  const handleEditorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    setIsUploadingEditorImage(true);
+    setGeneralError(null);
+
+    try {
+      const uploaded = await uploadImageFile(file);
+      if (uploaded) {
+        insertMarkdownAtCursor(`![${uploaded.name}](${uploaded.url})`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal mengunggah gambar";
+      setGeneralError(`Gagal mengunggah gambar: ${msg}`);
+    } finally {
+      setIsUploadingEditorImage(false);
+      if (editorFileInputRef.current) {
+        editorFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Editor textarea drag-and-drop upload
+  const handleTextareaDragOver = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragOverTextarea) setIsDragOverTextarea(true);
+  };
+
+  const handleTextareaDragLeave = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverTextarea(false);
+  };
+
+  const handleTextareaDrop = async (e: React.DragEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverTextarea(false);
+
+    const files = Array.from(e.dataTransfer.files).filter((file) =>
+      file.type.startsWith("image/")
+    );
+    if (files.length === 0) return;
+
+    setIsUploadingEditorImage(true);
+    setGeneralError(null);
+
+    try {
+      for (const file of files) {
+        const uploaded = await uploadImageFile(file);
+        if (uploaded) {
+          insertMarkdownAtCursor(`![${uploaded.name}](${uploaded.url})`);
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal mengunggah gambar dropzone";
+      setGeneralError(`Gagal mengunggah gambar yang di-drop: ${msg}`);
+    } finally {
+      setIsUploadingEditorImage(false);
+    }
+  };
+
+  // Cover image: direct file upload
+  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    setIsUploadingCoverImage(true);
+    setGeneralError(null);
+
+    try {
+      const uploaded = await uploadImageFile(file);
+      if (uploaded) {
+        setCoverImage(uploaded.url);
+        setCoverImageLoadError(false);
+        if (fieldErrors.coverImage) {
+          setFieldErrors((prev) => {
+            const next = { ...prev };
+            delete next.coverImage;
+            return next;
+          });
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal mengunggah gambar sampul";
+      setGeneralError(`Gagal mengunggah gambar sampul: ${msg}`);
+    } finally {
+      setIsUploadingCoverImage(false);
+      if (coverFileInputRef.current) {
+        coverFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Callback when an image is selected from MediaSelectModal
+  const handleMediaModalSelect = (media: MediaItem) => {
+    if (mediaTarget === "cover") {
+      setCoverImage(media.url);
+      setCoverImageLoadError(false);
+      if (fieldErrors.coverImage) {
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next.coverImage;
+          return next;
+        });
+      }
+    } else {
+      insertMarkdownAtCursor(`![${media.name}](${media.url})`);
+    }
+    setIsMediaSelectOpen(false);
+  };
 
   // Auto-generate slug from title
   const handleAutoGenerateSlug = () => {
@@ -157,7 +366,7 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
     setTags(tags.filter((t) => t !== tagToRemove));
   };
 
-  // Tag input keydown (support Enter and comma)
+  // Tag input keydown
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "," || e.key === "Enter") {
       e.preventDefault();
@@ -165,7 +374,7 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
     }
   };
 
-  // Client-side validation before dispatching to API
+  // Client-side validation harmonized with /uploads/...
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -203,10 +412,12 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
     }
 
     if (coverImage && coverImage.trim()) {
-      try {
-        new URL(coverImage.trim());
-      } catch {
-        errors.coverImage = "Format URL gambar sampul tidak valid (harus diawali http:// atau https://)";
+      const trimmed = coverImage.trim();
+      const isLocalUpload = trimmed.startsWith("/uploads/");
+      const isValidHttpUrl = /^https?:\/\//i.test(trimmed);
+
+      if (!isLocalUpload && !isValidHttpUrl) {
+        errors.coverImage = "Format URL gambar sampul tidak valid (harus diawali /uploads/ atau http:// atau https://)";
       }
     }
 
@@ -346,7 +557,7 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
           <button
             type="button"
             onClick={() => setGeneralError(null)}
-            className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-300"
+            className="text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -455,36 +666,100 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
               </div>
             </div>
 
-            {/* Cover Image URL */}
-            <div>
-              <Input
-                label="URL Gambar Sampul (Opsional)"
-                placeholder="https://images.unsplash.com/photo-..."
-                value={coverImage}
-                onChange={(e) => {
-                  setCoverImage(e.target.value);
-                  if (fieldErrors.coverImage) {
-                    setFieldErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.coverImage;
-                      return next;
-                    });
-                  }
-                }}
-                error={fieldErrors.coverImage}
-              />
-              {coverImage && (
-                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                  <ImageIcon className="w-4 h-4 text-gray-400" />
-                  <span>Pratinjau URL gambar:</span>
-                  <a
-                    href={coverImage}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-indigo-600 hover:underline truncate max-w-sm"
+            {/* Cover Image Section with 16:9 Preview, Media Selector, & Direct Upload */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Gambar Sampul (Cover Image)
+              </label>
+              
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1">
+                  <Input
+                    placeholder="URL gambar (contoh: /uploads/... atau https://...)"
+                    value={coverImage}
+                    onChange={(e) => {
+                      setCoverImage(e.target.value);
+                      setCoverImageLoadError(false);
+                      if (fieldErrors.coverImage) {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.coverImage;
+                          return next;
+                        });
+                      }
+                    }}
+                    error={fieldErrors.coverImage}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="md"
+                    onClick={() => {
+                      setMediaTarget("cover");
+                      setIsMediaSelectOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 text-xs whitespace-nowrap"
                   >
-                    {coverImage}
-                  </a>
+                    <FolderOpen className="w-3.5 h-3.5 text-indigo-500" />
+                    Pilih dari Pustaka
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="md"
+                    onClick={() => coverFileInputRef.current?.click()}
+                    disabled={isUploadingCoverImage}
+                    className="flex items-center gap-1.5 text-xs whitespace-nowrap"
+                  >
+                    {isUploadingCoverImage ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                    )}
+                    Unggah Sampul
+                  </Button>
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                    onChange={handleCoverImageUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* 16:9 Thumbnail Preview with Remove Button */}
+              {coverImage && (
+                <div className="mt-3 relative aspect-video max-w-sm rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 group shadow-sm">
+                  {!coverImageLoadError ? (
+                    <img
+                      src={coverImage}
+                      alt="Pratinjau Sampul"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={() => setCoverImageLoadError(true)}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 p-4 text-center">
+                      <AlertCircle className="w-6 h-6 text-amber-500 mb-1" />
+                      <span className="text-xs">Gambar tidak dapat dimuat dari URL ini</span>
+                    </div>
+                  )}
+                  
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCoverImage("");
+                        setCoverImageLoadError(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700 shadow transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Hapus Sampul
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -530,7 +805,7 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
                       <button
                         type="button"
                         onClick={() => handleRemoveTag(tag)}
-                        className="text-indigo-500 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors"
+                        className="text-indigo-500 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors cursor-pointer"
                         title="Hapus tag"
                       >
                         <X className="w-3 h-3" />
@@ -594,7 +869,7 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
                 <button
                   type="button"
                   onClick={() => setActiveTab("split")}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                     activeTab === "split"
                       ? "bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
@@ -606,7 +881,7 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
                 <button
                   type="button"
                   onClick={() => setActiveTab("editor")}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                     activeTab === "editor"
                       ? "bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
@@ -618,7 +893,7 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
                 <button
                   type="button"
                   onClick={() => setActiveTab("preview")}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                     activeTab === "preview"
                       ? "bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
@@ -646,32 +921,100 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
               {/* Left Pane: Markdown Source Textarea */}
               {(activeTab === "split" || activeTab === "editor") && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 px-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400 px-1">
                     <span className="font-semibold text-gray-700 dark:text-gray-300">
                       Markdown Source
                     </span>
+
+                    {/* Editor Action Toolbar */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setMediaTarget("content");
+                          setIsMediaSelectOpen(true);
+                        }}
+                        className="h-7 px-2 text-[11px] gap-1"
+                        title="Pilih gambar dari pustaka media untuk disisipkan ke posisi kursor"
+                      >
+                        <FolderOpen className="w-3 h-3 text-indigo-500" />
+                        Pilih dari Pustaka
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => editorFileInputRef.current?.click()}
+                        disabled={isUploadingEditorImage}
+                        className="h-7 px-2 text-[11px] gap-1"
+                        title="Unggah gambar lokal dan langsung sisipkan ke posisi kursor"
+                      >
+                        {isUploadingEditorImage ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Upload className="w-3 h-3 text-emerald-500" />
+                        )}
+                        Unggah Gambar
+                      </Button>
+                      <input
+                        ref={editorFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                        onChange={handleEditorImageUpload}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Textarea with Drag & Drop Listener */}
+                  <div className="relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={content}
+                      onChange={(e) => {
+                        setContent(e.target.value);
+                        if (fieldErrors.content) {
+                          setFieldErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.content;
+                            return next;
+                          });
+                        }
+                      }}
+                      onDragOver={handleTextareaDragOver}
+                      onDragLeave={handleTextareaDragLeave}
+                      onDrop={handleTextareaDrop}
+                      rows={20}
+                      placeholder="Tulis artikel dengan sintaks Markdown (heading ##, list -, code ```). Tarik & lepaskan gambar langsung ke area ini untuk mengunggah..."
+                      className={`w-full font-mono text-sm leading-relaxed p-4 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all min-h-[480px] resize-y ${
+                        isDragOverTextarea
+                          ? "border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-50/20 dark:bg-indigo-950/20"
+                          : "border-gray-300 dark:border-gray-700"
+                      }`}
+                    />
+
+                    {/* Drag Over Overlay indicator */}
+                    {isDragOverTextarea && (
+                      <div className="absolute inset-0 rounded-lg bg-indigo-600/10 dark:bg-indigo-500/20 backdrop-blur-[1px] border-2 border-dashed border-indigo-600 flex items-center justify-center pointer-events-none">
+                        <div className="bg-white dark:bg-gray-900 px-4 py-2.5 rounded-xl shadow-lg border border-indigo-200 dark:border-indigo-800 flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                          <Upload className="w-4 h-4 animate-bounce" />
+                          <span>Lepaskan gambar di sini untuk mengunggah otomatis</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                    <span>Tips: Anda dapat menarik & melepaskan (drag & drop) gambar langsung ke textarea</span>
                     <span>
                       {content.length} karakter &bull; ~
                       {Math.max(1, Math.ceil(content.trim().split(/\s+/).filter(Boolean).length / 200))}{" "}
                       menit baca
                     </span>
                   </div>
-                  <textarea
-                    value={content}
-                    onChange={(e) => {
-                      setContent(e.target.value);
-                      if (fieldErrors.content) {
-                        setFieldErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.content;
-                          return next;
-                        });
-                      }
-                    }}
-                    rows={20}
-                    placeholder="Tulis artikel dengan sintaks Markdown (heading ##, list -, code ```)..."
-                    className="w-full font-mono text-sm leading-relaxed p-4 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all min-h-[480px] resize-y"
-                  />
                 </div>
               )}
 
@@ -723,6 +1066,19 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
           </Button>
         </div>
       </form>
+
+      {/* Media Selector Modal */}
+      <MediaSelectModal
+        isOpen={isMediaSelectOpen}
+        onClose={() => setIsMediaSelectOpen(false)}
+        onSelect={handleMediaModalSelect}
+        title={mediaTarget === "cover" ? "Pilih Gambar Sampul Artikel" : "Sisipkan Gambar ke Konten Artikel"}
+        description={
+          mediaTarget === "cover"
+            ? "Pilih gambar dari pustaka media untuk dijadikan sampul artikel (16:9)"
+            : "Pilih gambar untuk disisipkan sebagai format Markdown pada posisi kursor"
+        }
+      />
     </div>
   );
 }

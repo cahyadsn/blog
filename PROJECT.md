@@ -1,101 +1,168 @@
-# Project: Interaction and Community Features (Like Counter & Newsletter System)
+# Project: Media Library CMS & Image Upload (Pustaka Media & Unggah Gambar)
 
 ## Architecture
-- Framework: Next.js 16.4.6 (App Router with Turbopack), React 19, TypeScript 5.7.3
-- Database & ORM: SQLite (`prisma/dev.db`) accessed via Prisma Client singleton (`@/lib/db`)
-  - Schema migration workflow: `npm.cmd run db:push && npm.cmd run db:generate`
-- Core Models in `prisma/schema.prisma`:
-  - `Post`: Includes `likes Int @default(0)` (indexed by slug and publishedAt)
-  - `Subscriber`: New model with `id String @id @default(cuid())`, `email String @unique`, `active Boolean @default(true)`, `createdAt DateTime @default(now())`
-- API Route Handlers:
-  - `src/app/api/posts/[id]/like/route.ts`: Dual-identifier (`id` CUID or `slug`), async params (`await params`), atomic increment (`likes: { increment: 1 }`), `GET` count, `POST` increment, rate limiting
-  - `src/app/api/newsletter/subscribe/route.ts`: Public subscription route, Zod email validation, lowercase normalization, idempotent duplicate handling returning HTTP 200 with `alreadySubscribed: true` without server errors or duplicate records
-  - `src/app/api/admin/subscribers/route.ts`: Protected admin route handler returning subscriber list, total count, and active count
-- Validation & Utility Layer:
-  - `src/lib/validations.ts`: `SubscriberSchema` using Zod 4.6.7 (`trim()`, `toLowerCase()`, `email()`, `max(100)`)
-  - `src/lib/rate-limit.ts`: In-memory sliding-window rate limiter tracking client IP, returning 429 Too Many Requests with `Retry-After` header and `resetRateLimit()` for test isolation
-- UI Components:
-  - `src/components/blog/LikeButton.tsx`: Client component with instant visual feedback, scale pulse animation, optimistic updates, and debounced API submission
-  - `src/components/blog/PostCard.tsx`: Displays total likes badge alongside calendar date and reading time
-  - `src/app/posts/[slug]/page.tsx`: Displays total likes count in header metadata bar and interactive `<LikeButton />` in engagement section before comments
-  - `src/components/blog/NewsletterForm.tsx`: Responsive newsletter form component with inline validation, loading states, and Indonesian success/duplicate/error alerts
-  - `src/components/blog/Footer.tsx`: Embeds newsletter subscription form above copyright
-  - `src/app/admin/page.tsx`: Displays "Pelanggan Newsletter" summary metric card and a "Pelanggan" management tab
-- Testing & Build:
-  - Vitest v5.1.0 in `node` environment, testing route handlers, schemas, rate limiter, and SQLite constraints
-  - Production build: `npm.cmd run build` completing with exit code 0 and zero TypeScript/lint errors
+- **Framework**: Next.js 16.4.6 (App Router with Turbopack), React 19, TypeScript 5.7.3 (`strict: true`)
+- **Runtime & APIs**: Node.js 22 runtime, Web Fetch API (`Request`, `Response`, `FormData`, `File`, `Blob`)
+- **Asset Storage & Public Serving**:
+  - Local disk storage: `path.join(process.cwd(), "public", "uploads")`
+  - Served automatically by Next.js static asset server at root URL `/uploads/<filename>`
+  - Automatic recursive directory initialization on demand: `fs.mkdir(uploadDir, { recursive: true })`
+  - `.gitignore`: Ignore `/public/uploads/*` except `/public/uploads/.gitkeep` to prevent repository pollution
+- **Media Validation & Security Helper (`src/lib/media.ts`)**:
+  - Allowed MIME types: `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `image/svg+xml`
+  - Buffer magic bytes verification:
+    - PNG: `89 50 4E 47 0D 0A 1A 0A`
+    - JPEG: `FF D8 FF`
+    - GIF: `47 49 46 38`
+    - WebP: `RIFF` ... `WEBP`
+    - SVG: Text inspection requiring `<svg` element and strictly blocking `<script>`, `javascript:`, `onload=`, `onerror=`
+  - Size validation: Max 5MB (`5 * 1024 * 1024 = 5,242,880` bytes); empty file (0 bytes) rejected
+  - Path traversal defense: `path.basename` extraction, null byte removal, path resolution containment check inside `public/uploads/`
+  - Unique filename generation: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${slug}.${ext}`
+- **Admin Media API Route Handlers**:
+  - `POST /api/admin/media/upload`: Multipart FormData parser, buffer & MIME validator, saves file to disk, returns status 201 with public URL and metadata
+  - `GET /api/admin/media`: Reads `public/uploads/`, formats size/date metadata, returns status 200 with media array sorted newest first (returns empty array if directory missing)
+  - `DELETE /api/admin/media/[id]`: Awaits `context.params` (`params: Promise<{ id: string }>`), sanitizes filename, unlinks file, returns status 200 (or 404 if missing, 400 if traversal detected)
+  - All routes protected by session authentication (`src/middleware.ts` and `isAuthenticatedAdmin()`)
+- **Admin CMS UI & Editor Integration**:
+  - `src/app/admin/page.tsx`: Extended `activeTab` type union (`"posts" | "comments" | "subscribers" | "media"`), tab button with `ImageIcon`, renders `<MediaLibrary />`
+  - `src/components/admin/MediaLibrary.tsx`: Media gallery with upload dropzone, search, refresh, responsive grid (`grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`), thumbnail preview, file size/date formatting, copy public URL button, copy Markdown snippet button (`![alt](/uploads/...)`), and delete button
+  - `src/components/admin/MediaDeleteModal.tsx`: Accessible modal confirmation dialog for file deletion
+  - `src/components/admin/MediaSelectModal.tsx`: Reusable image picker modal for selecting media from the library inside editor
+  - `src/components/admin/PostEditor.tsx`:
+    - Textarea ref (`textareaRef = useRef<HTMLTextAreaElement>(null)`)
+    - Helper `insertMarkdownAtCursor(snippet)` inserting at cursor position and refocusing
+    - Editor toolbar with "Unggah Gambar" and "Pilih dari Pustaka" buttons
+    - Drag-and-drop file upload on editor area with automatic markdown insertion
+    - Cover image support with "Pilih dari Pustaka" modal picker, direct "Unggah Sampul" button, 16:9 thumbnail preview, and "Hapus Sampul"
+    - Form validation update allowing `/uploads/...` relative paths for `coverImage`
+- **Validation Harmonization**:
+  - `src/lib/validations.ts`: Update `PostAdminSchema.coverImage` refinement to accept `/uploads/...` paths as well as valid URLs, while continuing to reject invalid strings (`bukan-url-valid`)
+- **Testing & Verification**:
+  - Vitest suite `tests/admin-media-api.test.ts` covering Tiers 1-4 (upload validation, magic bytes, boundary sizes, path traversal defense, delete operations, auth checks, test workspace cleanup)
+  - Preserves 100% pass rate across all 236 existing Vitest tests + 26 media tests + 51 challenger tests (total 313 tests)
+  - Production build `npm.cmd run build` completes with exit code 0 and zero TypeScript or Next.js compiler errors
+
+---
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source | Status |
 |---|---------|-------------|-----------|--------|--------|
-| 1 | Prisma Schema Update (Likes & Subscriber) | Add `likes Int @default(0)` to `Post` and add `Subscriber` model to `prisma/schema.prisma` | M1 | survey | DONE |
-| 2 | SQLite Database Migration | Push schema changes to `prisma/dev.db` and regenerate Prisma client via `npm.cmd run db:push && npm.cmd run db:generate` | M1 | survey | DONE |
-| 3 | Subscriber Zod Validation Schema | Add `SubscriberSchema` to `src/lib/validations.ts` with strict email validation and sanitization | M1 | survey | DONE |
-| 4 | Rate Limiter Utility | Create sliding-window rate limiter in `src/lib/rate-limit.ts` with `checkRateLimit` and `resetRateLimit` | M1 | survey | DONE |
-| 5 | Like/Clap API Route Handler | Implement `GET` and `POST` in `src/app/api/posts/[id]/like/route.ts` with dual lookup (ID/slug), atomic increment, and 429 rate limiting | M1 | survey | DONE |
-| 6 | Newsletter Subscription API Route Handler | Implement `POST /api/newsletter/subscribe` with Zod validation and idempotent duplicate response (HTTP 200 `alreadySubscribed`) | M1 | survey | DONE |
-| 7 | Admin Subscribers API Route Handler | Implement `GET /api/admin/subscribers` returning subscriber list and summary metrics | M1 | survey | DONE |
-| 8 | Interactive Like/Clap Button Component | Create `src/components/blog/LikeButton.tsx` with animation feedback, optimistic UI, and debounce | M1 | survey | DONE |
-| 9 | Post Detail Page Integration | Add like count in header meta bar and embed `<LikeButton />` before comments in `src/app/posts/[slug]/page.tsx` | M1 | survey | DONE |
-| 10 | Post Card Like Metric Display | Update `src/components/blog/PostCard.tsx` to render total likes badge in post card footer | M1 | survey | DONE |
-| 11 | Newsletter Form UI Component | Create `src/components/blog/NewsletterForm.tsx` with responsive design and inline alerts | M1 | survey | DONE |
-| 12 | Global Footer Newsletter Integration | Embed `<NewsletterForm />` in `src/components/blog/Footer.tsx` and optionally bottom of article pages | M1 | survey | DONE |
-| 13 | Admin Dashboard Subscriber Metrics & Tab | Add subscriber stat card and management tab in `src/app/admin/page.tsx` without breaking existing metrics | M1 | survey | DONE |
-| 14 | Automated Vitest Test Suites | Comprehensive test suites for Like API, rate limiting, newsletter validation, deduplication, and admin metrics | M1 | survey | DONE |
-| 15 | Zero Regressions & Build Verification | Verify all 160+ tests pass and `npm.cmd run build` succeeds with zero errors | M1 | survey | DONE |
+| 1 | Directory & Storage Setup | Create `public/uploads/` storage path with recursive initialization; configure `.gitignore` for uploaded assets | M1 | survey | DONE |
+| 2 | Media Validation Helper (`src/lib/media.ts`) | Strict MIME validation, magic byte buffer inspection, SVG XSS sanitization, 5MB boundary check, unique name generation | M1 | survey | DONE |
+| 3 | Safe Filename & Traversal Guard | Defensive path traversal prevention (`path.basename`, null byte stripping, directory boundary containment) | M1 | survey | DONE |
+| 4 | Cover Image Schema Harmonization (`src/lib/validations.ts`) | Refine `PostAdminSchema.coverImage` to accept `/uploads/...` relative paths while rejecting invalid non-URL strings | M1 | survey | DONE |
+| 5 | Upload Route Handler (`POST /api/admin/media/upload`) | Multipart FormData upload endpoint, file buffer validation, disk persistence, returns 201 with public URL and metadata | M1 | survey | DONE |
+| 6 | Media List Route Handler (`GET /api/admin/media`) | Endpoint returning all uploaded media files sorted newest first with metadata (name, url, size, createdAt); handles missing dir gracefully | M1 | survey | DONE |
+| 7 | Media Delete Route Handler (`DELETE /api/admin/media/[id]`) | Endpoint unlinking file by safe filename id, with path traversal rejection (400) and 404 for missing files | M1 | survey | DONE |
+| 8 | Media API Auth Protection | Verify admin session on all media routes returning 401 Unauthorized for unauthenticated requests | M1 | survey | DONE |
+| 9 | Admin Dashboard Tab Integration (`src/app/admin/page.tsx`) | Add "Pustaka Media" tab with `ImageIcon`, badge count, and seamless switching | M1 | survey | DONE |
+| 10 | Media Library Component (`src/components/admin/MediaLibrary.tsx`) | Gallery grid UI, upload zone, search filter, formatted size & date, copy public URL button, copy Markdown snippet button | M1 | survey | DONE |
+| 11 | Media Delete Modal (`src/components/admin/MediaDeleteModal.tsx`) | Accessible confirmation modal preventing accidental file deletion | M1 | survey | DONE |
+| 12 | Media Selector Modal (`src/components/admin/MediaSelectModal.tsx`) | Image picker modal for selecting library images into editor | M1 | survey | DONE |
+| 13 | PostEditor Cursor Markdown Insertion (`src/components/admin/PostEditor.tsx`) | `textareaRef`, `insertMarkdownAtCursor`, editor toolbar with "Unggah Gambar" and "Pilih dari Pustaka", drag-and-drop upload | M1 | survey | DONE |
+| 14 | PostEditor Cover Image Picker & Direct Upload | Select cover image from media library or upload directly, with 16:9 preview, remove button, and `/uploads/` support | M1 | survey | DONE |
+| 15 | Automated Vitest Media Test Suite (`tests/admin-media-api.test.ts`) | Tiers 1-4 tests (valid uploads, MIME/magic byte spoofing, 5MB boundary, empty file, path traversal, deletion, auth checks, test cleanup) | M1 | survey | DONE |
+| 16 | Regression & Production Build Verification | All 236 existing tests continue to pass (100%), and `npm.cmd run build` completes with exit code 0 | M1 | survey | DONE |
+
+---
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status | Key Outputs |
 |---|------|-------|-------------|--------|-------------|
-| 1 | Interaction & Community Features | All features (1-15) in Feature Inventory (R1, R2, R3) | none | DONE | Prisma Post.likes and Subscriber models; Like API with 429 rate limiting; Newsletter API with idempotent deduplication; Admin metrics and Subscriber management; LikeButton, NewsletterForm, and PostCard UI components; 41 unit/route tests + 31 adversarial stress tests (100% pass); Next.js 16 production build exit 0 |
+| 1 | Media Library CMS & Image Upload | All features (1–16) in Feature Inventory (Requirements R1, R2, R3, R4) | none | DONE | Storage helper `src/lib/media.ts`, route handlers `POST/GET/DELETE /api/admin/media/*`, UI components `MediaLibrary.tsx`, `MediaDeleteModal.tsx`, `MediaSelectModal.tsx`, `PostEditor.tsx` & `admin/page.tsx` integration, test suites `tests/admin-media-api.test.ts` + challenger suites (313 tests passed), clean build exit 0 |
+
+---
 
 ## Interface Contracts
-### Like / Clap API (`src/app/api/posts/[id]/like/route.ts`)
-- `export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response>`
-  - Param: `const { id: identifier } = await params;`
-  - Lookup: Finds post by `id` or `slug`.
-  - Not found: Returns HTTP 404 `{ success: false, error: "Artikel tidak ditemukan" }`.
-  - Success: Returns HTTP 200 `{ success: true, likes: post.likes }`.
-- `export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response>`
-  - Rate limit check: Checks client IP. If exceeded (>10 requests/10s), returns HTTP 429 `{ success: false, error: "Terlalu banyak permintaan suka...", retryAfter: 10 }` with `Retry-After: 10` header.
-  - Parameter validation: Returns HTTP 400 if identifier is empty or whitespace.
-  - Lookup: Finds post by `id` or `slug`. If not found, returns HTTP 404 `{ success: false, error: "Artikel tidak ditemukan" }`.
-  - Atomic increment: `db.post.update({ where: { id: post.id }, data: { likes: { increment: 1 } } })`.
-  - Success: Returns HTTP 200 `{ success: true, likes: updatedPost.likes }`.
 
-### Newsletter Subscription API (`src/app/api/newsletter/subscribe/route.ts`)
-- `export async function POST(req: Request): Promise<Response>`
-  - Request body: `{ email: string }`
-  - Validation: `SubscriberSchema.safeParse(body)`
-    - Invalid: Returns HTTP 400 `{ success: false, error: issue.message }`.
-  - Normalization: `const email = data.email.toLowerCase().trim();`
-  - Duplicate check: `db.subscriber.findUnique({ where: { email } })`
-    - Already subscribed: Returns HTTP 200 `{ success: true, message: "Email Anda sudah terdaftar dalam newsletter kami.", alreadySubscribed: true }`. (Does not throw 409 or 500, does not create duplicate row).
-    - Inactive / previously unsubscribed: Reactivates record (`active: true`), returns HTTP 200 `{ success: true, message: "Langganan newsletter Anda telah diaktifkan kembali!", subscriber }`.
-    - New subscriber: Creates row `db.subscriber.create({ data: { email, active: true } })`, returns HTTP 201 `{ success: true, message: "Terima kasih telah berlangganan newsletter kami!", subscriber }`.
+### Media Validation Utility (`src/lib/media.ts`)
+- `export const ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"] as const;`
+- `export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5,242,880 bytes`
+- `export function validateImageBuffer(buffer: Buffer, mimeType: string): { valid: boolean; error?: string }`
+- `export function sanitizeFilename(originalName: string): string`
+- `export function getSafeFilePath(filename: string): { safePath: string; safeName: string } | null`
+- `export function formatFileSize(bytes: number): string`
 
-### Admin Subscribers API (`src/app/api/admin/subscribers/route.ts`)
-- `export async function GET(req: Request): Promise<Response>`
-  - Protected by `src/middleware.ts`
-  - Returns HTTP 200 `{ success: true, subscribers, totalCount, activeCount }`.
+### POST `/api/admin/media/upload`
+- **Request**: `multipart/form-data` with field `file` (`File` / `Blob`)
+- **Headers**: Admin session cookie (`admin_session`)
+- **Responses**:
+  - `201 Created`:
+    ```json
+    {
+      "success": true,
+      "url": "/uploads/1731427200000-abcd-banner.png",
+      "media": {
+        "name": "1731427200000-abcd-banner.png",
+        "url": "/uploads/1731427200000-abcd-banner.png",
+        "size": 102400,
+        "type": "image/png",
+        "createdAt": "2026-11-12T17:00:00.000Z"
+      }
+    }
+    ```
+  - `400 Bad Request`: `{ "success": false, "error": "Ukuran berkas melebihi batas 5MB" | "Tipe berkas tidak diizinkan..." | "Berkas gambar tidak boleh kosong" | "Isi berkas tidak cocok dengan format gambar yang valid" }`
+  - `401 Unauthorized`: `{ "success": false, "error": "Akses ditolak: Autentikasi admin diperlukan." }`
+  - `500 Internal Server Error`: `{ "success": false, "error": "Gagal menyimpan berkas" }`
 
-### Rate Limiter (`src/lib/rate-limit.ts`)
-- `export function checkRateLimit(identifier: string, limit?: number, windowMs?: number): { success: boolean; retryAfter?: number }`
-- `export function resetRateLimit(): void`
+### GET `/api/admin/media`
+- **Request**: Query parameters none
+- **Headers**: Admin session cookie (`admin_session`)
+- **Responses**:
+  - `200 OK`:
+    ```json
+    {
+      "success": true,
+      "media": [
+        {
+          "name": "1731427200000-abcd-banner.png",
+          "url": "/uploads/1731427200000-abcd-banner.png",
+          "size": 102400,
+          "type": "image/png",
+          "createdAt": "2026-11-12T17:00:00.000Z"
+        }
+      ]
+    }
+    ```
+  - `401 Unauthorized`: `{ "success": false, "error": "Akses ditolak: Autentikasi admin diperlukan." }`
+
+### DELETE `/api/admin/media/[id]`
+- **Request**: Dynamic parameter `id` (or query `?filename=`)
+- **Next.js Signature**: `export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }): Promise<Response>`
+- **Responses**:
+  - `200 OK`: `{ "success": true, "message": "Berkas berhasil dihapus" }`
+  - `400 Bad Request`: `{ "success": false, "error": "Nama berkas tidak valid" }`
+  - `401 Unauthorized`: `{ "success": false, "error": "Akses ditolak: Autentikasi admin diperlukan." }`
+  - `404 Not Found`: `{ "success": false, "error": "Berkas tidak ditemukan" }`
+
+### Cover Image Schema Refinement (`src/lib/validations.ts`)
+- In `PostAdminSchema`:
+  ```typescript
+  coverImage: z
+    .string()
+    .trim()
+    .refine(
+      (val) => !val || val.startsWith("/uploads/") || /^https?:\/\//i.test(val),
+      { message: "URL gambar tidak valid" }
+    )
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  ```
+
+---
 
 ## Code Layout
-- `prisma/schema.prisma`: Post model likes field, Subscriber model.
-- `src/lib/validations.ts`: Subscriber Zod schema.
-- `src/lib/rate-limit.ts`: In-memory sliding window rate limiter.
-- `src/app/api/posts/[id]/like/route.ts`: Dual lookup like route handler (GET & POST).
-- `src/app/api/newsletter/subscribe/route.ts`: Newsletter subscription route handler.
-- `src/app/api/admin/subscribers/route.ts`: Admin subscribers route handler.
-- `src/components/blog/LikeButton.tsx`: Interactive animated like button client component.
-- `src/components/blog/NewsletterForm.tsx`: Responsive newsletter form component.
-- `src/components/blog/PostCard.tsx`: Post card like count display.
-- `src/components/blog/Footer.tsx`: Global footer newsletter form integration.
-- `src/app/posts/[slug]/page.tsx`: Post detail like counter and button integration.
-- `src/app/admin/page.tsx`: Admin dashboard subscriber metric card and tab integration.
-- `tests/likes-api.test.ts`: Vitest test suite for like counter & rate limiting.
-- `tests/newsletter.test.ts`: Vitest test suite for newsletter validation & deduplication.
-- `tests/admin-subscribers.test.ts`: Vitest test suite for admin subscribers API.
+- `src/lib/media.ts`: MIME verification, buffer magic bytes inspection, SVG sanitization, 5MB boundary check, unique filename generation, path traversal guard, size formatting.
+- `src/lib/validations.ts`: Refined `PostAdminSchema.coverImage` refinement allowing `/uploads/...`.
+- `src/app/api/admin/media/upload/route.ts`: Multipart form-data upload route handler.
+- `src/app/api/admin/media/route.ts`: Media listing route handler (newest first).
+- `src/app/api/admin/media/[id]/route.ts`: Media deletion route handler with traversal guard.
+- `src/app/admin/page.tsx`: Extended `activeTab` with `"media"`, tab button with `ImageIcon`, renders `MediaLibrary`.
+- `src/components/admin/MediaLibrary.tsx`: Media gallery component with upload zone, search, refresh, responsive grid, copy URL/Markdown, delete trigger.
+- `src/components/admin/MediaDeleteModal.tsx`: Delete confirmation modal dialog.
+- `src/components/admin/MediaSelectModal.tsx`: Reusable media selector modal for PostEditor.
+- `src/components/admin/PostEditor.tsx`: Textarea cursor insertion, toolbar buttons, drag-and-drop upload, cover image picker/upload, preview thumbnail.
+- `.gitignore`: Updated to ignore `/public/uploads/*` except `/public/uploads/.gitkeep`.
+- `tests/admin-media-api.test.ts`: Vitest test suite for upload validation, MIME spoofing, boundary sizes, path traversal defense, file deletion, auth checks, and clean workspace isolation.
