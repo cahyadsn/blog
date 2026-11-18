@@ -9,6 +9,7 @@ Selamat datang di **Panduan Pengguna Antigravity Multi-Agent Blog**. Dokumen ini
 2. [Panduan Pembaca (Public Blog Interface)](#2-panduan-pembaca-public-blog-interface)
    - [Navigasi Beranda & Toggle Tema (Dark/Light Mode)](#navigasi-beranda--toggle-tema-darklight-mode)
    - [Pencarian Artikel & Filter Tag (Full-Text Search)](#pencarian-artikel--filter-tag-full-text-search)
+   - [Menjelajah Seri Artikel & Panduan Berurutan (Article Series)](#menjelajah-seri-artikel--panduan-berurutan-article-series)
    - [Membaca Artikel & Memberikan Apresiasi (Like / Clap Counter)](#membaca-artikel--memberikan-apresiasi-like--clap-counter)
    - [Berlangganan Buletin Teknis (Newsletter Subscription)](#berlangganan-buletin-teknis-newsletter-subscription)
    - [Sindikasi Konten & SEO (RSS Feed & Social Cards)](#sindikasi-konten--seo-rss-feed--social-cards)
@@ -20,6 +21,7 @@ Selamat datang di **Panduan Pengguna Antigravity Multi-Agent Blog**. Dokumen ini
    - [Moderasi Komentar (Comment Moderation)](#moderasi-komentar-comment-moderation)
    - [Membalas Komentar sebagai Author](#membalas-komentar-sebagai-author)
    - [Manajemen Pelanggan Newsletter (Subscriber Management)](#manajemen-pelanggan-newsletter-subscriber-management)
+   - [Manajemen Seri Artikel (Series & Collections Management)](#manajemen-seri-artikel-series--collections-management)
    - [Manajemen Pustaka Media (Media Library CMS)](#manajemen-pustaka-media-media-library-cms)
    - [Keluar dari Sesi Admin (Logout)](#keluar-dari-sesi-admin-logout)
 4. [Panduan Agen Operasional Mandiri (Autonomous Agents)](#4-panduan-agen-operasional-mandiri-autonomous-agents)
@@ -66,6 +68,19 @@ Pada bagian atas beranda (*Hero Section*), tersedia kotak pencarian interaktif:
    - Sistem akan memfilter daftar artikel yang memiliki tag tersebut secara instan.
 3. **Reset Pencarian**:
    - Klik tombol **"Reset Filter"** atau tombol silang (x) di dalam kolom input untuk kembali menampilkan seluruh artikel.
+
+### Menjelajah Seri Artikel & Panduan Berurutan (Article Series)
+Aplikasi menyediakan navigasi pembelajaran terstruktur melalui koleksi seri artikel:
+1. **Katalog Seri Publik (`/series`)**:
+   - Klik tautan **"Seri"** pada Navbar utama atau kunjungi `http://localhost:3000/series`.
+   - Menampilkan kartu-kartu seri panduan yang memuat judul, deskripsi, gambar sampul, jumlah bagian artikel, dan akumulasi estimasi waktu membaca keseluruhan seri.
+2. **Kurikulum Roadmap Seri (`/series/[slug]`)**:
+   - Klik pada kartu seri untuk membuka kurikulum lengkap seri tersebut.
+   - Menampilkan daftar bab artikel yang disusun secara berurutan langkah-demi-langkah (Bagian 1, Bagian 2, dst.) lengkap dengan tautan langsung ke artikel terkait.
+3. **Membaca Artikel dalam Seri & Navigasi Antar-Bab (`/posts/[slug]`)**:
+   - Jika artikel yang sedang Anda baca merupakan bagian dari sebuah seri:
+     - **Banner Daftar Isi (`SeriesTOCBanner`)**: Terletak di bawah judul artikel, menampilkan nama seri dan tombol *Daftar Isi Seri* yang dapat diperluas (*collapsible*) untuk melompat ke bab lain kapan saja.
+     - **Navigasi Dua Arah (`SeriesPrevNextNav`)**: Di akhir artikel, tersedia kartu navigasi otomatis **"← Bagian Sebelumnya"** dan **"Bagian Selanjutnya →"** yang memudahkan pembaca melanjutkan materi secara berurutan.
 
 ### Membaca Artikel & Memberikan Apresiasi (Like / Clap Counter)
 1. Klik judul artikel atau tombol **"Baca →"** pada kartu artikel untuk membuka halaman detail (`/posts/[slug]`).
@@ -204,6 +219,26 @@ Pilih tab **"Pelanggan Newsletter"** di Dashboard Admin:
 2. **Pencarian & Filter**: Cari pelanggan berdasarkan alamat email atau filter berdasarkan status (`Semua`, `Aktif`, `Nonaktif`).
 3. **Toggle Status Langganan**: Klik tombol toggle untuk menonaktifkan atau mengaktifkan kembali langganan suatu email tanpa menghapus rekam jejaknya.
 4. **Hapus Pelanggan**: Klik tombol hapus untuk membersihkan data email jika diminta oleh pengguna (*right-to-be-forgotten*).
+
+---
+
+### Manajemen Seri Artikel (Series & Collections Management)
+
+Pilih tab **"Manajemen Seri"** di Dashboard Admin (`/admin`):
+1. **Membuat Seri Baru**:
+   - Klik tombol **"Tambah Seri Baru"**.
+   - Masukkan **Judul Seri** (slug URL otomatis dihasilkan secara instan dari judul).
+   - Masukkan **Deskripsi** singkat mengenai tujuan pembelajaran seri ini.
+   - Pilih atau masukkan URL **Gambar Sampul** (dapat menggunakan integrasi modal pemilih dari Pustaka Media).
+   - Klik **"Simpan Seri"**.
+2. **Mengubah & Menghapus Seri**:
+   - **Edit**: Klik tombol ikon pensil pada baris seri untuk memperbarui rincian seri.
+   - **Hapus**: Klik tombol ikon tempat sampah. Sistem akan menampilkan dialog konfirmasi penghapusan aman (`SeriesDeleteModal`). Menghapus seri **tidak akan** menghapus artikel-artikel di dalamnya, melainkan hanya melepaskan status keterkaitan seri (`seriesId = null`).
+3. **Menetapkan Artikel ke dalam Seri**:
+   - Pada form editor artikel (`PostEditor.tsx`), temukan bagian **"Pengaturan Seri Artikel"**.
+   - Pilih nama seri dari dropdown **"Pilih Seri"**.
+   - Masukkan nomor bab/urutan artikel pada kolom **"Urutan dalam Seri"** (misal: `1`, `2`, `3`).
+   - Simpan artikel. Sistem secara otomatis menyusun urutan kurikulum dan menghubungkan navigasi sebelumnya/selanjutnya pada artikel tersebut.
 
 ---
 

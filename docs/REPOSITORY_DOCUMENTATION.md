@@ -70,11 +70,14 @@ Menyimpan seluruh artikel blog publik maupun draf internal.
 - `published`: Boolean (`@default(true)`)
 - `likes`: Int (`@default(0)`) -> Akumulasi tanda suka / apresiasi pembaca
 - `readingTime`: Int (`@default(3)`)
+- `seriesId`: String? (Foreign Key ke `Series.id`, Indexed, SetNull on delete)
+- `orderInSeries`: Int? (Nomor urut posisi artikel di dalam seri, misal: 1, 2, 3)
 - `publishedAt`: DateTime (`@default(now())`, Indexed)
 - `createdAt` & `updatedAt`: DateTime
 - **Relasi**:
   - `tags`: Relasi Many-to-Many melalui `PostTag` (Cascade Delete)
   - `comments`: Relasi One-to-Many ke `Comment` (Cascade Delete)
+  - `series`: Relasi Many-to-One ke `Series` (SetNull onDelete)
 
 ### B. Model `Comment`
 Menyimpan komentar publik, balasan bersarang (*threaded replies*), dan status kurasi.
@@ -100,6 +103,17 @@ Menyimpan data pelanggan buletin teknis (newsletter).
 - `active`: Boolean (`@default(true)`) -> Status keaktifan langganan
 - `createdAt`: DateTime (`@default(now())`)
 
+### E. Model `Series`
+Mengelompokkan artikel ke dalam kurikulum pembelajaran berurutan.
+- `id`: String (Primary Key, `@default(cuid())`)
+- `title`: String
+- `slug`: String (Unique, Indexed)
+- `description`: String? (Opsional)
+- `coverImage`: String? (Opsional)
+- `createdAt` & `updatedAt`: DateTime
+- **Relasi**:
+  - `posts`: Relasi One-to-Many ke `Post` (dapat diurutkan via `orderInSeries`)
+
 ---
 
 ## 3. Spesifikasi API Endpoints
@@ -110,6 +124,8 @@ Menyimpan data pelanggan buletin teknis (newsletter).
 |---|---|---|---|
 | `GET` | `/api/posts` | Mengambil seluruh artikel yang berstatus `published: true` | `200 OK` |
 | `POST` | `/api/posts` | Membuat artikel baru melalui payload terstruktur | `201 Created` / `400 Bad Request` |
+| `GET` | `/api/series` | Mengambil seluruh daftar seri publik dengan hitungan artikel terpublikasi | `200 OK` |
+| `GET` | `/api/series/[slug]` | Mengambil detail kurikulum seri beserta daftar artikel berurutan (`orderInSeries: asc`) | `200 OK` / `404 Not Found` |
 | `GET` | `/api/posts/[id]/like` | Mengambil jumlah total tanda suka artikel (by CUID atau slug) | `200 OK` / `404 Not Found` |
 | `POST` | `/api/posts/[id]/like` | Menambahkan tanda suka secara atomik dengan proteksi rate limit | `200 OK` / `429 Too Many Requests` |
 | `POST` | `/api/comments` | Mengirim komentar pembaca dengan filter spam otomatis | `201 Created` / `400 Bad Request` |
@@ -154,6 +170,10 @@ Menyimpan data pelanggan buletin teknis (newsletter).
 | `GET` | `/api/admin/media` | Mengambil seluruh berkas media lokal di `public/uploads` dengan filter `?search=...` | Admin |
 | `GET` | `/api/admin/media/[id]` | Mengambil metadata spesifik satu berkas media (nama, URL, ukuran, tanggal unggah) | Admin |
 | `DELETE` | `/api/admin/media/[id]` | Menghapus berkas media fisik dari disk secara aman (proteksi path traversal) | Admin |
+| `GET` | `/api/admin/series` | Mengambil seluruh seri artikel untuk pengelolaan di CMS Admin | Admin |
+| `POST` | `/api/admin/series` | Membuat seri artikel baru dengan validasi Zod & pencegahan duplikasi slug | Admin |
+| `PUT` | `/api/admin/series/[id]` | Memperbarui informasi seri artikel (judul, slug, deskripsi, cover) | Admin |
+| `DELETE` | `/api/admin/series/[id]` | Menghapus seri secara aman dengan pelepasan relasi artikel transaksional | Admin |
 
 ---
 
@@ -168,19 +188,23 @@ src/
 │   ├── page.tsx                   # Server Component: Homepage publik & daftar postingan
 │   ├── globals.css                # Konfigurasi Tailwind, CSS variable, dan tema warna
 │   ├── posts/
-│   │   └── [slug]/page.tsx        # Detail artikel dengan konversi Markdown & diskusi pembaca
+│   │   └── [slug]/page.tsx        # Detail artikel dengan konversi Markdown & widget navigasi seri
+│   ├── series/
+│   │   ├── page.tsx               # Katalog seri publik
+│   │   └── [slug]/page.tsx        # Detail kurikulum roadmap seri
 │   └── admin/
 │       ├── layout.tsx             # Shell antarmuka khusus admin
-│       └── page.tsx               # Client Component: State management untuk tab artikel, moderasi, & media
+│       └── page.tsx               # Client Component: State management untuk tab artikel, moderasi, media, & seri
 ├── components/
 │   ├── ui/                        # Komponen atomik: Button, Badge, Card, Input, Textarea
-│   ├── blog/                      # Komponen pembaca: PostCard, CommentSection, LikeButton, NewsletterForm
-│   └── admin/                     # Komponen CMS: PostList, PostEditor, CommentList, SubscriberList, MediaLibrary, MediaDeleteModal, MediaSelectModal
+│   ├── blog/                      # Komponen pembaca: PostCard, CommentSection, LikeButton, NewsletterForm, SeriesCard, SeriesNavWidget
+│   └── admin/                     # Komponen CMS: PostList, PostEditor, CommentList, SubscriberList, MediaLibrary, SeriesList, SeriesModal, SeriesDeleteModal
 └── lib/
     ├── db.ts                      # Singleton PrismaClient dengan isolasi hot-reload
     ├── markdown.ts                # Parser marked & fungsi penghitung waktu baca (WPM)
     ├── media.ts                   # Engine utilitas media: MIME whitelist, magic bytes, sanitasi SVG, & penamaan berkas
     ├── rate-limit.ts              # Sliding-window rate limiter in-memory
+    ├── series-nav.ts              # Utilitas perhitungan navigasi sekuensial artikel seri (prev/next)
     └── validations.ts             # Schema validasi Zod untuk seluruh operasi data
 ```
 
@@ -188,7 +212,7 @@ src/
 
 ## 5. Infrastruktur Pengujian (Testing Infrastructure)
 
-Pengujian diotomatisasi menggunakan **Vitest** dan mencakup 17 berkas uji dengan total **313 test cases (100% lulus)**:
+Pengujian diotomatisasi menggunakan **Vitest** dan mencakup 20 berkas uji dengan total **367 test cases (100% lulus)**:
 
 ```powershell
 npx.cmd vitest run
@@ -248,6 +272,13 @@ npx.cmd vitest run
     - Pengujian batas ekstrem penyimpanan berkas: directory traversal (`../`), null-byte injection, double-extension spoofing, berkas 0-byte, dan penulisan bersamaan.
 17. `tests/challenger-media-security.test.ts` (15 tests):
     - Pengujian keamanan payload: inspeksi biner magic bytes (menolak file PHP/EXE berkedok PNG/JPG) dan sanitasi mendalam vektor SVG anti-XSS (`<script>`, event handler inline).
+18. `tests/series-api.test.ts` (34 tests):
+    - Pengujian kontrak rute API publik `/api/series` dan `/api/series/[slug]`.
+    - Pengujian CRUD rute admin `/api/admin/series`, validasi skema Zod, proteksi duplikasi slug, dan penetapan nomor urut artikel di `POST/PUT /api/admin/posts`.
+19. `tests/series-navigation.test.ts` (12 tests):
+    - Pengujian unit algoritma navigasi sekuensial artikel (`src/lib/series-nav.ts`): kasus batas artikel pertama, tengah, terakhir, artikel tunggal, dan penanganan ketidakhadiran nomor urut.
+20. `tests/series-integration.test.ts` (5 tests):
+    - Pengujian integrasi langsung terhadap database SQLite nyata (`prisma/dev.db`): penegakan relasi foreign key, batasan unik slug, dan transaksi *safe deletion* (melepas relasi `seriesId` tanpa menghapus artikel).
 
 ---
 

@@ -15,6 +15,13 @@ export async function GET(
       include: {
         tags: { include: { tag: true } },
         _count: { select: { comments: true } },
+        series: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+          },
+        },
       },
     });
 
@@ -68,6 +75,23 @@ export async function PUT(
       );
     }
 
+    let targetSeriesId: string | null = null;
+    let targetOrderInSeries: number | null = null;
+
+    if (validatedData.seriesId && validatedData.seriesId.trim()) {
+      const seriesExists = await db.series.findUnique({
+        where: { id: validatedData.seriesId.trim() },
+      });
+      if (!seriesExists) {
+        return NextResponse.json(
+          { success: false, error: "Seri artikel yang dipilih tidak ditemukan" },
+          { status: 400 }
+        );
+      }
+      targetSeriesId = validatedData.seriesId.trim();
+      targetOrderInSeries = validatedData.orderInSeries ?? 1;
+    }
+
     const readingTime = calculateReadingTime(validatedData.content);
 
     // Sinkronisasi tag dan perbarui artikel dalam transaksi
@@ -88,6 +112,8 @@ export async function PUT(
           coverImage: validatedData.coverImage || null,
           published: validatedData.published,
           readingTime,
+          seriesId: targetSeriesId,
+          orderInSeries: targetOrderInSeries,
           tags: {
             create: validatedData.tags.map((tagName) => {
               const cleanSlug = tagName.toLowerCase().replace(/[^\w-]/g, "") || tagName.toLowerCase();
@@ -108,6 +134,13 @@ export async function PUT(
         include: {
           tags: { include: { tag: true } },
           _count: { select: { comments: true } },
+          series: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+            },
+          },
         },
       });
     });

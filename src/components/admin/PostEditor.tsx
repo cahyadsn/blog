@@ -50,6 +50,13 @@ export interface PostItem {
   createdAt?: string | Date;
   updatedAt?: string | Date;
   tags?: Array<PostTagItem | string>;
+  seriesId?: string | null;
+  orderInSeries?: number | null;
+  series?: {
+    id: string;
+    title: string;
+    slug: string;
+  } | null;
   _count?: {
     comments: number;
   };
@@ -84,6 +91,35 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
   const [published, setPublished] = useState(initialPost?.published ?? true);
   const [tags, setTags] = useState<string[]>(initialTagNames);
   const [tagInput, setTagInput] = useState("");
+
+  // Series states
+  const [availableSeries, setAvailableSeries] = useState<
+    Array<{ id: string; title: string; slug: string }>
+  >([]);
+  const [seriesId, setSeriesId] = useState<string>(initialPost?.seriesId || "");
+  const [orderInSeries, setOrderInSeries] = useState<number | string>(
+    initialPost?.orderInSeries ?? ""
+  );
+
+  // Fetch available series on mount
+  useEffect(() => {
+    fetch("/api/admin/series")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.series)) {
+          setAvailableSeries(data.series);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync series fields if initialPost changes
+  useEffect(() => {
+    if (initialPost) {
+      setSeriesId(initialPost.seriesId || "");
+      setOrderInSeries(initialPost.orderInSeries ?? "");
+    }
+  }, [initialPost]);
 
   // Editor layout view: "split" (dual pane) | "editor" | "preview"
   const [activeTab, setActiveTab] = useState<"split" | "editor" | "preview">("split");
@@ -421,6 +457,13 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
       }
     }
 
+    if (seriesId && orderInSeries !== "" && orderInSeries !== null && orderInSeries !== undefined) {
+      const num = Number(orderInSeries);
+      if (isNaN(num) || num < 1 || !Number.isInteger(num)) {
+        errors.orderInSeries = "Nomor urut seri harus berupa bilangan bulat positif (minimal 1)";
+      }
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -446,6 +489,11 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
       coverImage: coverImage.trim() || null,
       published: published,
       tags: tags,
+      seriesId: seriesId.trim() || null,
+      orderInSeries:
+        seriesId.trim() && orderInSeries !== "" && orderInSeries !== null
+          ? Number(orderInSeries)
+          : null,
     };
 
     const isEdit = Boolean(initialPost?.id);
@@ -813,6 +861,86 @@ export function PostEditor({ initialPost, onSave, onCancel }: PostEditorProps) {
                     </Badge>
                   ))
                 )}
+              </div>
+            </div>
+
+            {/* Series Configuration Section */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-850/40 space-y-3 mt-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">
+                  Pengaturan Seri Artikel (Opsional)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+                {/* Series Dropdown */}
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Pilih Seri Artikel
+                  </label>
+                  <select
+                    value={seriesId}
+                    onChange={(e) => {
+                      setSeriesId(e.target.value);
+                      if (!e.target.value) {
+                        setOrderInSeries("");
+                        if (fieldErrors.orderInSeries) {
+                          setFieldErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.orderInSeries;
+                            return next;
+                          });
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer"
+                  >
+                    <option value="">-- Tidak Masuk Seri Artikel --</option>
+                    {availableSeries.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.title}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Gabungkan artikel ini ke dalam kurikulum pembelajaran bertahap
+                  </p>
+                </div>
+
+                {/* Order in Series Input */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Bagian ke-
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Contoh: 1"
+                    disabled={!seriesId}
+                    value={orderInSeries}
+                    onChange={(e) => {
+                      setOrderInSeries(e.target.value);
+                      if (fieldErrors.orderInSeries) {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.orderInSeries;
+                          return next;
+                        });
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-900"
+                  />
+                  {fieldErrors.orderInSeries && (
+                    <p className="text-[11px] text-rose-500 font-medium">
+                      {fieldErrors.orderInSeries}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Urutan artikel dalam seri
+                  </p>
+                </div>
               </div>
             </div>
 

@@ -43,10 +43,45 @@ export const PostCreateSchema = z.object({
     .optional()
     .nullable(),
   tags: z.array(z.string()).default([]),
+  seriesId: z.string().trim().optional().nullable().or(z.literal("")),
+  orderInSeries: z.coerce.number().int().positive("Nomor urut seri harus bernilai positif").optional().nullable(),
 });
 
 export type CommentInput = z.infer<typeof CommentSchema>;
 export type PostCreateInput = z.infer<typeof PostCreateSchema>;
+
+export const SeriesSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(3, "Judul seri minimal 3 karakter")
+    .max(150, "Judul seri maksimal 150 karakter"),
+  slug: z
+    .string()
+    .trim()
+    .min(3, "Slug seri minimal 3 karakter")
+    .max(120, "Slug seri maksimal 120 karakter")
+    .regex(/^[a-z0-9-]+$/, "Slug hanya boleh berisi huruf kecil, angka, dan strip (-)"),
+  description: z
+    .string()
+    .trim()
+    .max(1000, "Deskripsi maksimal 1000 karakter")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  coverImage: z
+    .string()
+    .trim()
+    .refine(
+      (val) => !val || val.startsWith("/uploads/") || /^https?:\/\//i.test(val),
+      { message: "URL gambar tidak valid" }
+    )
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+});
+
+export type SeriesInput = z.infer<typeof SeriesSchema>;
 
 export const PostAdminSchema = z.object({
   title: z.string().trim().min(5, "Judul minimal 5 karakter").max(200, "Judul maksimal 200 karakter"),
@@ -70,6 +105,8 @@ export const PostAdminSchema = z.object({
     .or(z.literal("")),
   published: z.boolean().default(true),
   tags: z.array(z.string()).default([]),
+  seriesId: z.string().trim().optional().nullable().or(z.literal("")),
+  orderInSeries: z.coerce.number().int().positive("Nomor urut seri harus bernilai positif").optional().nullable(),
 });
 
 export const CommentStatusSchema = z.object({

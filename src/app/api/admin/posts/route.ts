@@ -28,6 +28,13 @@ export async function GET(req: Request) {
       include: {
         tags: { include: { tag: true } },
         _count: { select: { comments: true } },
+        series: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+          },
+        },
       },
     });
 
@@ -55,6 +62,23 @@ export async function POST(req: Request) {
       );
     }
 
+    let targetSeriesId: string | null = null;
+    let targetOrderInSeries: number | null = null;
+
+    if (validatedData.seriesId && validatedData.seriesId.trim()) {
+      const seriesExists = await db.series.findUnique({
+        where: { id: validatedData.seriesId.trim() },
+      });
+      if (!seriesExists) {
+        return NextResponse.json(
+          { success: false, error: "Seri artikel yang dipilih tidak ditemukan" },
+          { status: 400 }
+        );
+      }
+      targetSeriesId = validatedData.seriesId.trim();
+      targetOrderInSeries = validatedData.orderInSeries ?? 1;
+    }
+
     const readingTime = calculateReadingTime(validatedData.content);
 
     const post = await db.post.create({
@@ -66,6 +90,8 @@ export async function POST(req: Request) {
         coverImage: validatedData.coverImage || null,
         published: validatedData.published,
         readingTime,
+        seriesId: targetSeriesId,
+        orderInSeries: targetOrderInSeries,
         tags: {
           create: validatedData.tags.map((tagName) => {
             const cleanSlug = tagName.toLowerCase().replace(/[^\w-]/g, "") || tagName.toLowerCase();
@@ -86,6 +112,13 @@ export async function POST(req: Request) {
       include: {
         tags: { include: { tag: true } },
         _count: { select: { comments: true } },
+        series: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+          },
+        },
       },
     });
 

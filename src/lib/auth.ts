@@ -77,3 +77,30 @@ export async function isAuthenticatedAdmin(): Promise<boolean> {
   const sessionCookie = cookieStore.get(ADMIN_COOKIE_NAME);
   return verifySessionToken(sessionCookie?.value);
 }
+
+/**
+ * Memeriksa apakah session admin saat ini valid dari cookies atau header request (Route Handler)
+ */
+export async function verifyAdminRequest(req: Request): Promise<boolean> {
+  try {
+    const isAuth = await isAuthenticatedAdmin();
+    if (isAuth) return true;
+  } catch {
+    // Luar request context Server Component
+  }
+
+  try {
+    const cookieHeader = req.headers.get("cookie");
+    if (cookieHeader) {
+      const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${ADMIN_COOKIE_NAME}=([^;]+)`));
+      if (match && match[1]) {
+        return await verifySessionToken(decodeURIComponent(match[1]));
+      }
+    }
+  } catch {
+    // Abaikan error cookie parsing
+  }
+
+  return false;
+}
+

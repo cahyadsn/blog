@@ -7,6 +7,7 @@ import { PostList } from "@/components/admin/PostList";
 import { CommentList, CommentCounts } from "@/components/admin/CommentList";
 import { SubscriberList } from "@/components/admin/SubscriberList";
 import { MediaLibrary } from "@/components/admin/MediaLibrary";
+import { SeriesList } from "@/components/admin/SeriesList";
 import {
   FileText,
   EyeOff,
@@ -18,12 +19,14 @@ import {
   Layers,
   Users,
   Image as ImageIcon,
+  BookOpen,
 } from "lucide-react";
 
 interface AdminMetrics {
   totalPosts: number;
   publishedPosts: number;
   draftPosts: number;
+  totalSeries: number;
   totalComments: number;
   pendingComments: number;
   approvedComments: number;
@@ -34,14 +37,15 @@ interface AdminMetrics {
 }
 
 export default function AdminDashboardPage() {
-  // Active Tab: "posts" | "comments" | "subscribers" | "media"
-  const [activeTab, setActiveTab] = useState<"posts" | "comments" | "subscribers" | "media">("posts");
+  // Active Tab: "posts" | "series" | "comments" | "subscribers" | "media"
+  const [activeTab, setActiveTab] = useState<"posts" | "series" | "comments" | "subscribers" | "media">("posts");
 
   // Metrics State
   const [metrics, setMetrics] = useState<AdminMetrics>({
     totalPosts: 0,
     publishedPosts: 0,
     draftPosts: 0,
+    totalSeries: 0,
     totalComments: 0,
     pendingComments: 0,
     approvedComments: 0,
@@ -53,25 +57,28 @@ export default function AdminDashboardPage() {
 
   const [isLoadingMetrics, setIsLoadingMetrics] = useState<boolean>(true);
 
-  // Fetch summary metrics from posts, comments, subscribers, and media APIs
+  // Fetch summary metrics from posts, series, comments, subscribers, and media APIs
   const fetchMetrics = useCallback(async () => {
     setIsLoadingMetrics(true);
     try {
-      const [postsRes, commentsRes, subscribersRes, mediaRes] = await Promise.all([
+      const [postsRes, seriesRes, commentsRes, subscribersRes, mediaRes] = await Promise.all([
         fetch("/api/admin/posts?status=all"),
+        fetch("/api/admin/series"),
         fetch("/api/admin/comments?status=ALL"),
         fetch("/api/admin/subscribers"),
         fetch("/api/admin/media"),
       ]);
 
-      const [postsData, commentsData, subscribersData, mediaData] = await Promise.all([
+      const [postsData, seriesData, commentsData, subscribersData, mediaData] = await Promise.all([
         postsRes.json(),
+        seriesRes.ok ? seriesRes.json().catch(() => ({ success: false, series: [] })) : { success: false, series: [] },
         commentsRes.json(),
         subscribersRes.json(),
         mediaRes.ok ? mediaRes.json().catch(() => ({ success: false, media: [] })) : { success: false, media: [] },
       ]);
 
       const postsList = postsData.success && Array.isArray(postsData.posts) ? postsData.posts : [];
+      const seriesList = seriesData.success && Array.isArray(seriesData.series) ? seriesData.series : [];
       const commentsList =
         commentsData.success && Array.isArray(commentsData.comments)
           ? commentsData.comments
@@ -80,6 +87,8 @@ export default function AdminDashboardPage() {
       const totalPosts = postsList.length;
       const publishedPosts = postsList.filter((p: { published: boolean }) => p.published).length;
       const draftPosts = totalPosts - publishedPosts;
+
+      const totalSeries = seriesList.length;
 
       const totalComments = commentsList.length;
       const pendingComments = commentsList.filter(
@@ -115,6 +124,7 @@ export default function AdminDashboardPage() {
         totalPosts,
         publishedPosts,
         draftPosts,
+        totalSeries,
         totalComments,
         pendingComments,
         approvedComments,
@@ -133,6 +143,14 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     fetchMetrics();
   }, [fetchMetrics]);
+
+  // Callback to sync series count updates from SeriesList
+  const handleSeriesCountsUpdate = (count: number) => {
+    setMetrics((prev) => ({
+      ...prev,
+      totalSeries: count,
+    }));
+  };
 
   // Callback to sync comment count updates from CommentList
   const handleCommentCountsUpdate = (counts: CommentCounts) => {
@@ -187,7 +205,7 @@ export default function AdminDashboardPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4">
           {/* Card 1: Total Artikel */}
           <Card className="hover:border-indigo-300 dark:hover:border-indigo-800 transition-all">
             <CardContent className="p-5 flex items-center justify-between">
@@ -208,7 +226,27 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 2: Artikel Draf */}
+          {/* Card 2: Total Seri Artikel */}
+          <Card className="hover:border-indigo-300 dark:hover:border-indigo-800 transition-all">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Total Seri Artikel
+                </p>
+                <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+                  {isLoadingMetrics ? "..." : metrics.totalSeries}
+                </div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                  Koleksi panduan
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-sm">
+                <BookOpen className="w-6 h-6" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 3: Artikel Draf */}
           <Card className="hover:border-amber-300 dark:hover:border-amber-800 transition-all">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
@@ -228,7 +266,7 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 3: Komentar Pending */}
+          {/* Card 4: Komentar Pending */}
           <Card
             className={`transition-all ${
               metrics.pendingComments > 0
@@ -254,7 +292,7 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 4: Komentar Spam */}
+          {/* Card 5: Komentar Spam */}
           <Card className="hover:border-rose-300 dark:hover:border-rose-800 transition-all">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
@@ -274,7 +312,7 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 5: Pelanggan Newsletter */}
+          {/* Card 6: Pelanggan Newsletter */}
           <Card className="hover:border-emerald-300 dark:hover:border-emerald-800 transition-all">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
@@ -294,7 +332,7 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card 6: Pustaka Media */}
+          {/* Card 7: Pustaka Media */}
           <Card className="hover:border-violet-300 dark:hover:border-violet-800 transition-all">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
@@ -332,6 +370,22 @@ export default function AdminDashboardPage() {
             <span>Manajemen Artikel</span>
             <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-1">
               {metrics.totalPosts}
+            </Badge>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("series")}
+            className={`flex items-center gap-2.5 pb-3 px-2 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+              activeTab === "series"
+                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+                : "border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Manajemen Seri</span>
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-1">
+              {metrics.totalSeries}
             </Badge>
           </button>
 
@@ -393,6 +447,9 @@ export default function AdminDashboardPage() {
         {/* Tab Content Display */}
         <div className="pt-2">
           {activeTab === "posts" && <PostList />}
+          {activeTab === "series" && (
+            <SeriesList onCountsUpdate={handleSeriesCountsUpdate} />
+          )}
           {activeTab === "comments" && (
             <CommentList onCountsUpdate={handleCommentCountsUpdate} />
           )}

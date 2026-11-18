@@ -2,7 +2,7 @@
 
 A modern, production-grade, full-stack blog application engineered and maintained by an **autonomous Multi-Agent System** using **Google Antigravity**, **Next.js 15 (App Router)**, **React 19**, **Tailwind CSS**, and **Prisma ORM**.
 
-Now featuring **Media Library CMS & Image Upload**, **Interactive Like/Clap Counter**, **Newsletter Subscription Suite**, **SEO & RSS Syndication**, **Full-Text Article Search**, **Interactive Dark/Light Mode**, and **Protected Admin Authentication**, alongside the complete **Admin CMS Dashboard** and autonomous operations.
+Now featuring **Article Series & Collections**, **Media Library CMS & Image Upload**, **Interactive Like/Clap Counter**, **Newsletter Subscription Suite**, **SEO & RSS Syndication**, **Full-Text Article Search**, **Interactive Dark/Light Mode**, and **Protected Admin Authentication**, alongside the complete **Admin CMS Dashboard** and autonomous operations.
 
 ---
 
@@ -61,7 +61,7 @@ flowchart TD
 | **Database Agent** | Relational schema modeling & migrations | On-demand | `prisma/schema.prisma`, `prisma/seed.ts`, `src/lib/db.ts` |
 | **Backend API Agent** | Auth logic, Admin API, Zod validation | On-demand | `src/app/api/*`, `src/app/api/admin/*`, `src/lib/auth.ts`, `src/middleware.ts` |
 | **Frontend UI/UX Agent** | Public blog, SearchBar, Admin CMS, Live Preview | On-demand | `src/app/page.tsx`, `SearchBar.tsx`, `src/app/admin/*`, `src/components/admin/*` |
-| **Unit Testing Agent** | Vitest test suites & lifecycle verification | CI / Pre-commit | `tests/*` (**313/313 tests passing 100% across 17 test suites**) |
+| **Unit Testing Agent** | Vitest test suites & lifecycle verification | CI / Pre-commit | `tests/*` (**367/367 tests passing 100% across 20 test suites**) |
 | **Technical Writer Agent** | User guides, API specifications & repository docs | On-demand / Release | `docs/USER_GUIDE.md`, `docs/REPOSITORY_DOCUMENTATION.md` |
 | **DevOps Agent** | Git version control & GitHub Actions CI/CD | Push / Pull Request | `.github/workflows/ci.yml` |
 | **Content Creator Agent** | Generates in-depth tech articles from backlog | Scheduled (`0 8 * * *`) | `scripts/daily-content.ts`, `content/backlog.json` |
@@ -72,6 +72,11 @@ flowchart TD
 ## ⚡ Features & Capabilities
 
 ### 1. Reader Blog Interface & Engagement
+- **Article Series & Multi-Part Collections**:
+  - Public Series Directory (`/series`) menampilkan seluruh koleksi seri artikel dengan akumulasi waktu baca, lencana jumlah bagian, dan deskripsi komprehensif.
+  - Series Curriculum Page (`/series/[slug]`) dengan peta jalan pembelajaran terstruktur dari bagian awal hingga akhir.
+  - In-Article Sequential Reading (`SeriesNavWidget.tsx`): Banner daftar isi interaktif yang dapat diperluas (*collapsible TOC*) di awal artikel serta navigasi dua arah **"← Bagian Sebelumnya"** dan **"Bagian Selanjutnya →"** di akhir artikel.
+  - Navigasi global: Tautan menu **"Seri"** pada Navbar utama.
 - **Interactive Like / Clap Counter**: Optimistic client-side feedback with heart-pulse and float-up animations, 500ms debouncing, sliding-window rate limiting on the backend (`POST /api/posts/[id]/like`), and real-time like counts on cards and post headers.
 - **Newsletter Subscription System**: Elegant subscription form (`NewsletterForm.tsx`) with instant Zod email validation, idempotent deduplication, and automatic reactivation for returning subscribers (`POST /api/newsletter/subscribe`).
 - **SEO & RSS Syndication Suite**:
@@ -100,6 +105,11 @@ flowchart TD
   - Filter by status: `PENDING`, `APPROVED`, `SPAM`.
   - Quick action buttons: **Approve**, **Mark as Spam**, **Delete**.
   - **Direct Author Reply**: Respond directly to readers with the `isAuthorReply: true` badge.
+- **Manajemen Seri Artikel (Series & Collections CMS)**:
+  - Tab khusus **"Manajemen Seri"** pada Dashboard Admin (`/admin`) dengan tabel interaktif, pencarian real-time, link pratinjau publik, serta metrik jumlah bab.
+  - Dialog modal buat & edit seri (`SeriesModal.tsx`) dengan generator slug otomatis dan pemilihan cover image dari pustaka media.
+  - Modal konfirmasi hapus aman (`SeriesDeleteModal.tsx`) dengan jaminan pelepasan relasi artikel transaksional (`seriesId = null, orderInSeries = null`) tanpa menghapus artikel fisiknya.
+  - Form `PostEditor.tsx`: Kontrol dropdown pemilihan seri dan input nomor urut bab artikel dalam seri.
 - **Pustaka Media & Unggah Gambar (Media Library CMS)**:
   - **Penyimpanan Lokal Andal**: Gambar disimpan secara lokal pada direktori `public/uploads/` dengan penamaan teracak deterministik berbasis timestamp dan hash kriptografis (`{timestamp}-{randomHex}-{sanitizedName}.{ext}`) guna mencegah tabrakan nama berkas dan race condition di disk.
   - **Validasi Multi-Layer & Keamanan Ketat**:
@@ -140,7 +150,7 @@ flowchart TD
 - **Data Validation & Sanitization**: [Zod](https://zod.dev/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Markdown Parser**: [Marked](https://marked.js.org/)
-- **Testing**: [Vitest](https://vitest.dev/) (313 automated test cases across 17 test suites)
+- **Testing**: [Vitest](https://vitest.dev/) (367 automated test cases across 20 test suites)
 - **CI/CD**: GitHub Actions
 
 ---

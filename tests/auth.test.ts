@@ -3,6 +3,8 @@ import {
   validateAdminCredentials,
   generateSessionToken,
   verifySessionToken,
+  verifyAdminRequest,
+  ADMIN_COOKIE_NAME,
 } from "@/lib/auth";
 
 describe("Admin Authentication Unit Tests", () => {
@@ -33,5 +35,33 @@ describe("Admin Authentication Unit Tests", () => {
     expect(await verifySessionToken("bukan-token-valid")).toBe(false);
     expect(await verifySessionToken(null)).toBe(false);
     expect(await verifySessionToken("")).toBe(false);
+  });
+
+  it("harus memvalidasi request dengan cookie admin_session yang sah via verifyAdminRequest", async () => {
+    const token = await generateSessionToken("admin");
+    const req = new Request("http://localhost:3000/api/admin/series", {
+      headers: {
+        cookie: `${ADMIN_COOKIE_NAME}=${encodeURIComponent(token)}`,
+      },
+    });
+
+    const isAuth = await verifyAdminRequest(req);
+    expect(isAuth).toBe(true);
+  });
+
+  it("harus menolak request tanpa cookie admin_session via verifyAdminRequest", async () => {
+    const req = new Request("http://localhost:3000/api/admin/series");
+    const isAuth = await verifyAdminRequest(req);
+    expect(isAuth).toBe(false);
+  });
+
+  it("harus menolak request dengan cookie admin_session palsu via verifyAdminRequest", async () => {
+    const req = new Request("http://localhost:3000/api/admin/series", {
+      headers: {
+        cookie: `${ADMIN_COOKIE_NAME}=invalid-session-token`,
+      },
+    });
+    const isAuth = await verifyAdminRequest(req);
+    expect(isAuth).toBe(false);
   });
 });

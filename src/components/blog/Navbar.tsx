@@ -24,6 +24,9 @@ export function Navbar() {
           <Link href="/" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
             Beranda
           </Link>
+          <Link href="/series" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+            Seri
+          </Link>
           <Link
             href="/admin"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-gray-800 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300 transition-colors font-semibold text-gray-800 dark:text-gray-200"

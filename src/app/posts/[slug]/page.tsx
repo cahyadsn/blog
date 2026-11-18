@@ -6,6 +6,7 @@ import { parseMarkdownToHtml } from "@/lib/markdown";
 import { Badge } from "@/components/ui/badge";
 import { CommentSection } from "@/components/blog/CommentSection";
 import { LikeButton } from "@/components/blog/LikeButton";
+import { SeriesTOCBanner, SeriesPrevNextNav } from "@/components/blog/SeriesNavWidget";
 import { Calendar, Clock, ChevronLeft, User, Heart } from "lucide-react";
 
 export const revalidate = 0; // dynamic
@@ -77,6 +78,21 @@ export default async function PostDetailPage({
     include: {
       tags: {
         include: { tag: true },
+      },
+      series: {
+        include: {
+          posts: {
+            where: { published: true },
+            orderBy: [{ orderInSeries: "asc" }, { publishedAt: "asc" }],
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              orderInSeries: true,
+              readingTime: true,
+            },
+          },
+        },
       },
       comments: {
         where: {
@@ -154,11 +170,29 @@ export default async function PostDetailPage({
         </div>
       </header>
 
+      {/* In-Post Series Table of Contents Banner */}
+      {post.series && post.series.posts.length > 0 && (
+        <SeriesTOCBanner
+          series={post.series}
+          currentPostId={post.id}
+          currentSlug={post.slug}
+        />
+      )}
+
       {/* Konten Artikel Prose */}
       <div
         className="prose prose-indigo dark:prose-invert max-w-none text-base leading-relaxed"
         dangerouslySetInnerHTML={{ __html: htmlContent }}
       />
+
+      {/* In-Post Series Prev / Next Navigation Bar */}
+      {post.series && post.series.posts.length > 0 && (
+        <SeriesPrevNextNav
+          series={post.series}
+          currentPostId={post.id}
+          currentSlug={post.slug}
+        />
+      )}
 
       {/* Bagian Interaktif Like / Clap Button */}
       <div className="my-12 py-8 border-y border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 text-center">

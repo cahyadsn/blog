@@ -21,11 +21,30 @@ model Post {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  seriesId      String?
+  orderInSeries Int?
+  series        Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+
   tags        PostTag[]
   comments    Comment[]
 
   @@index([slug])
   @@index([publishedAt])
+  @@index([seriesId])
+}
+
+model Series {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  coverImage  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts       Post[]
+
+  @@index([slug])
 }
 
 model Tag {
