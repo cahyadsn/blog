@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { parseMarkdownToHtml } from "@/lib/markdown";
+import { parseMarkdownWithToc } from "@/lib/toc";
 import { Badge } from "@/components/ui/badge";
 import { CommentSection } from "@/components/blog/CommentSection";
 import { LikeButton } from "@/components/blog/LikeButton";
 import { SeriesTOCBanner, SeriesPrevNextNav } from "@/components/blog/SeriesNavWidget";
+import { TableOfContents } from "@/components/blog/TableOfContents";
 import { Calendar, Clock, ChevronLeft, User, Heart } from "lucide-react";
 
 export const revalidate = 0; // dynamic
@@ -114,7 +115,8 @@ export default async function PostDetailPage({
     notFound();
   }
 
-  const htmlContent = await parseMarkdownToHtml(post.content);
+  const { html: htmlContent, headings } = await parseMarkdownWithToc(post.content);
+  const hasToc = headings.length > 0;
 
   const formattedDate = new Date(post.publishedAt).toLocaleDateString("id-ID", {
     day: "numeric",
@@ -123,7 +125,7 @@ export default async function PostDetailPage({
   });
 
   return (
-    <article className="max-w-3xl mx-auto">
+    <article className={hasToc ? "max-w-5xl mx-auto" : "max-w-3xl mx-auto"}>
       {/* Tombol Kembali */}
       <Link
         href="/"
@@ -170,45 +172,62 @@ export default async function PostDetailPage({
         </div>
       </header>
 
-      {/* In-Post Series Table of Contents Banner */}
-      {post.series && post.series.posts.length > 0 && (
-        <SeriesTOCBanner
-          series={post.series}
-          currentPostId={post.id}
-          currentSlug={post.slug}
-        />
-      )}
-
-      {/* Konten Artikel Prose */}
       <div
-        className="prose prose-indigo dark:prose-invert max-w-none text-base leading-relaxed"
-        dangerouslySetInnerHTML={{ __html: htmlContent }}
-      />
+        className={
+          hasToc
+            ? "lg:grid lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-10 lg:items-start"
+            : ""
+        }
+      >
+        {/* Table of Contents: collapsible inline on mobile, sticky sidebar on desktop */}
+        {hasToc && (
+          <aside className="mb-8 lg:mb-0 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24">
+            <TableOfContents headings={headings} />
+          </aside>
+        )}
 
-      {/* In-Post Series Prev / Next Navigation Bar */}
-      {post.series && post.series.posts.length > 0 && (
-        <SeriesPrevNextNav
-          series={post.series}
-          currentPostId={post.id}
-          currentSlug={post.slug}
-        />
-      )}
+        <div className={hasToc ? "min-w-0 lg:col-start-1 lg:row-start-1" : ""}>
+          {/* In-Post Series Table of Contents Banner */}
+          {post.series && post.series.posts.length > 0 && (
+            <SeriesTOCBanner
+              series={post.series}
+              currentPostId={post.id}
+              currentSlug={post.slug}
+            />
+          )}
 
-      {/* Bagian Interaktif Like / Clap Button */}
-      <div className="my-12 py-8 border-y border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 text-center">
-        <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-1">
-          Menyukai artikel ini? Berikan apresiasi Anda!
-        </p>
-        <LikeButton
-          postId={post.id}
-          slug={post.slug}
-          postSlug={post.slug}
-          initialLikes={post.likes ?? 0}
-        />
+          {/* Konten Artikel Prose */}
+          <div
+            className="prose prose-indigo dark:prose-invert max-w-none text-base leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+
+          {/* In-Post Series Prev / Next Navigation Bar */}
+          {post.series && post.series.posts.length > 0 && (
+            <SeriesPrevNextNav
+              series={post.series}
+              currentPostId={post.id}
+              currentSlug={post.slug}
+            />
+          )}
+
+          {/* Bagian Interaktif Like / Clap Button */}
+          <div className="my-12 py-8 border-y border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center gap-2 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-1">
+              Menyukai artikel ini? Berikan apresiasi Anda!
+            </p>
+            <LikeButton
+              postId={post.id}
+              slug={post.slug}
+              postSlug={post.slug}
+              initialLikes={post.likes ?? 0}
+            />
+          </div>
+
+          {/* Kolom Komentar */}
+          <CommentSection postId={post.id} initialComments={post.comments} />
+        </div>
       </div>
-
-      {/* Kolom Komentar */}
-      <CommentSection postId={post.id} initialComments={post.comments} />
     </article>
   );
 }

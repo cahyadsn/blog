@@ -47,3 +47,13 @@ body {
 .animate-heart-pulse {
   animation: heartPulse 0.45s ease-in-out;
 }
+
+/* Smooth anchor scrolling & sticky navbar clearance for article headings */
+html {
+  scroll-behavior: smooth;
+}
+
+.prose h2[id],
+.prose h3[id] {
+  scroll-margin-top: 5.5rem;
+}

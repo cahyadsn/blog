@@ -280,13 +280,29 @@ d:/c/blog/
 - [Node.js](https://nodejs.org/) v20 or higher (v24 tested & supported)
 - [Git](https://git-scm.com/)
 
-### 2. Installation
+### 2. Cara Cepat: One-Click Windows Script (.bat)
+Untuk pengguna Windows, Anda dapat menginstal dan menyiapkan seluruh aplikasi secara otomatis hanya dengan menjalankan file skrip batch:
+1. Klik ganda (**double-click**) pada file **`instal_blog.bat`** (atau jalankan via Command Prompt / PowerShell: `.\instal_blog.bat`).
+2. Skrip akan secara otomatis:
+   - Memeriksa instalasi Node.js & npm.
+   - Menyiapkan file konfigurasi `.env`.
+   - Membuat direktori penyimpanan media `public/uploads`.
+   - Menginstal semua dependensi (`npm install`).
+   - Melakukan generate Prisma Client & migrasi skema SQLite (`prisma db push`).
+   - Menawarkan pengisian data awal artikel contoh & komentar (`seed`).
+   - Menawarkan opsi untuk langsung menyalakan server lokal.
+
+Untuk menyalakan server di kemudian hari tanpa perlu instalasi ulang, cukup klik ganda file **`jalankan_blog.bat`**.
+
+---
+
+### 3. Instalasi Manual via CLI
 ```powershell
 cd d:\c\blog
 npm.cmd install
 ```
 
-### 3. Database Setup & Seeding
+### 4. Database Setup & Seeding
 ```powershell
 # Push Prisma schema to SQLite
 npm.cmd run db:push
@@ -295,7 +311,7 @@ npm.cmd run db:push
 npm.cmd run db:seed
 ```
 
-### 4. Running the Application
+### 5. Running the Application
 ```powershell
 npm.cmd run dev
 ```
